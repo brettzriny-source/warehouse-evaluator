@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;color:#111827;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
@@ -143,6 +144,35 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .btn-delete-draft:active{background:#fee2e2}
 .compress-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6b7280;margin-left:8px}
 .storage-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:8px}
+.scan-card{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:12px}
+.scan-card h3{font-size:14px;font-weight:600;color:#1e40af;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.scan-result{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-top:12px}
+.scan-result-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;border-bottom:1px solid #f3f4f6}
+.scan-result-row:last-child{border:none}
+.scan-result-row .label{color:#6b7280;font-weight:500}
+.scan-result-row .value{color:#1f2937;font-weight:600}
+.btn-scan{background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;width:auto;font-size:13px;display:flex;align-items:center;gap:6px;border:none}
+.btn-scan:active{background:#1e3a8a}
+.btn-scan:disabled{background:#9ca3af}
+.checkbox-row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.checkbox-row input[type="checkbox"]{width:20px;height:20px;border-radius:4px;accent-color:#2563eb;flex-shrink:0}
+.checkbox-row label{font-size:14px;font-weight:500;color:#1f2937}
+.crime-card{background:#fefce8;border:1px solid #fde68a;border-radius:12px;padding:16px;margin-bottom:12px}
+.crime-card h3{font-size:14px;font-weight:600;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.crime-links{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.crime-links a{font-size:13px;color:#2563eb;text-decoration:none;display:flex;align-items:center;gap:4px}
+.crime-links a:active{color:#1d4ed8}
+.rank-section{margin-bottom:20px}
+.rank-header{font-size:14px;font-weight:600;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.rank-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:12px}
+.rank-num{font-size:20px;font-weight:800;min-width:28px;text-align:center}
+.rank-info{flex:1;min-width:0}
+.rank-info .name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-info .meta{font-size:11px;color:#6b7280;margin-top:2px}
+.rank-score{font-size:18px;font-weight:700;min-width:32px;text-align:right}
+.rank-tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px}
+.rank-tab{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#4b5563;white-space:nowrap;flex-shrink:0}
+.rank-tab.active{background:#2563eb;color:#fff;border-color:#2563eb}
 @media print{.sticky,button,input[type="file"],.header,.section-pills,.nav-row{display:none!important}body{font-size:12px}}
 </style>
 </head>
@@ -370,6 +400,90 @@ function compressPhoto(dataUrl, maxDim = 1600, quality = 0.7) {
   });
 }
 
+// ─── Tour Book OCR Parser ───
+function parseTourBook(text) {
+  const result = {};
+  const lines = text.replace(/\r/g, "").split("\n").map(l => l.trim()).filter(Boolean);
+  const full = lines.join(" ");
+
+  // Parking
+  const parkM = full.match(/(\d+)\s*(?:parking\s*(?:stalls?|spaces?|spots?)|stalls?)/i);
+  if (parkM) result.parking = parkM[1];
+
+  // Clear height
+  const clrM = full.match(/(\d+)[''′\s]*(?:clear\s*height|clear\s*ht|clearance)/i) || full.match(/(\d+)[''′]\s*(?:clear|ceiling)/i);
+  if (clrM) result.clear_ft = clrM[1];
+
+  // Dock doors
+  const dockM = full.match(/(\d+)\s*(?:dock\s*(?:doors?|high)|loading\s*doors?)/i);
+  if (dockM) result.num_docks = dockM[1];
+
+  // Drive-in / ground level doors
+  const driveM = full.match(/(\d+)\s*(?:drive[- ]?in|ground\s*level)\s*doors?/i);
+  if (driveM) result.num_drive = driveM[1];
+
+  // Amps
+  const ampM = full.match(/(\d[\d,]*)\s*amps?/i);
+  if (ampM) result.amps = ampM[1].replace(/,/g, "");
+
+  // Voltage
+  const voltM = full.match(/([\d\/]+)\s*volts?/i);
+  if (voltM) result.voltage = voltM[1];
+
+  // Office SF
+  const offM = full.match(/([\d,]+)\s*(?:sf|sq\.?\s*ft\.?)\s*(?:of\s*)?office/i) || full.match(/office\s*(?:space)?\s*[:\-]?\s*([\d,]+)\s*(?:sf|sq)/i);
+  if (offM) result.office_sf = offM[1].replace(/,/g, "");
+
+  // Total SF / warehouse SF
+  const sfM = full.match(/([\d,]+)\s*(?:sf|sq\.?\s*ft\.?)\s*(?:warehouse|industrial|building|total)/i);
+  if (sfM) result.total_sf = sfM[1].replace(/,/g, "");
+
+  // Available SF
+  const availM = full.match(/(?:available|for\s*lease)\s*[:\-]?\s*([\d,]+)\s*(?:sf|sq)/i);
+  if (availM) result.availableSF = availM[1].replace(/,/g, "");
+
+  // Year built
+  const yrM = full.match(/(?:built|constructed|year\s*built)\s*[:\-]?\s*(\d{4})/i);
+  if (yrM) result.yearBuilt = yrM[1];
+
+  // Sprinklers
+  const sprinkM = full.match(/sprinkler/i);
+  if (sprinkM) result.hasSprinklers = true;
+
+  // Column spacing
+  const colM = full.match(/(\d+)\s*[x×X]\s*(\d+)\s*(?:column|col)/i) || full.match(/column\s*spacing\s*[:\-]?\s*(\d+)\s*[x×X]\s*(\d+)/i);
+  if (colM) result.col_space = colM[1] + "x" + colM[2];
+
+  // Dock height
+  const dkHtM = full.match(/dock\s*(?:height|ht)\s*[:\-]?\s*(\d+)/i);
+  if (dkHtM) result.dock_ht = dkHtM[1];
+
+  // Asking rate
+  const rateM = full.match(/\$\s*([\d.]+)\s*(?:\/\s*sf|per\s*sq)/i);
+  if (rateM) result.askingRate = "$" + rateM[1];
+
+  // Slab thickness
+  const slabM = full.match(/(\d+)[""″\s]*(?:slab|concrete\s*(?:thickness|slab))/i);
+  if (slabM) result.slab_in = slabM[1];
+
+  return result;
+}
+
+// ─── Crime Data Lookup ───
+function getCrimeLinks(city, state, zip) {
+  const links = [];
+  const loc = encodeURIComponent((city + " " + state).trim());
+  if (city && state) {
+    links.push({ label: "CrimeGrade.org - Area Safety Report", url: `https://crimegrade.org/safest-places-in-${city.toLowerCase().replace(/\s+/g, "-")}-${state.toLowerCase()}/` });
+    links.push({ label: "AreaVibes - Crime Data", url: `https://www.areavibes.com/${city.toLowerCase().replace(/\s+/g, "-")}-${state.toLowerCase()}/crime/` });
+  }
+  if (zip) {
+    links.push({ label: "SpotCrime - Recent Incidents", url: `https://spotcrime.com/map?lat=0&lon=0&address=${zip}` });
+    links.push({ label: "CrimeMapping.com", url: `https://www.crimemapping.com/map/location/${zip}` });
+  }
+  return links;
+}
+
 // ─── Simplified Sections ───
 const DEFAULT_SECTIONS = [
   { id:"exterior", name:"Exterior & Access", icon:"mapPin",
@@ -379,11 +493,12 @@ const DEFAULT_SECTIONS = [
       {id:"signage",label:"Signage & Visibility",score:0,notes:""},
       {id:"perimeter",label:"Perimeter Security",score:0,notes:""}
     ],
-    measurements:[{id:"lot_size",label:"Lot Size (acres)",value:""},{id:"parking",label:"Parking Spaces",value:""}],
+    measurements:[{id:"parking",label:"Parking Spaces",value:""}],
     photos:[] },
   { id:"dock", name:"Dock & Loading", icon:"truck",
     criteria:[
-      {id:"docks",label:"Dock Doors (Count & Condition)",score:0,notes:""}
+      {id:"dock_condition",label:"Dock Door Condition",score:0,notes:""},
+      {id:"dock_location",label:"Dock Door Location & Access",score:0,notes:""}
     ],
     measurements:[{id:"num_docks",label:"# Dock Doors",value:""},{id:"num_drive",label:"# Drive-In Doors",value:""},{id:"dock_ht",label:"Dock Height (in)",value:""}],
     photos:[] },
@@ -391,7 +506,6 @@ const DEFAULT_SECTIONS = [
     criteria:[
       {id:"clear_ht",label:"Clear Height",score:0,notes:""},
       {id:"columns",label:"Column Spacing",score:0,notes:""},
-      {id:"concrete",label:"Concrete Thickness",score:0,notes:""},
       {id:"roof",label:"Roof Condition",score:0,notes:""}
     ],
     measurements:[{id:"clear_ft",label:"Clear Height (ft)",value:""},{id:"col_space",label:"Column Spacing (ft×ft)",value:""},{id:"total_sf",label:"Total Warehouse SF",value:""},{id:"slab_in",label:"Slab Thickness (in)",value:""}],
@@ -412,11 +526,12 @@ const DEFAULT_SECTIONS = [
     ],
     measurements:[{id:"office_sf",label:"Office SF",value:""}],
     photos:[] },
-  { id:"safety", name:"Safety", icon:"shield",
+  { id:"safety", name:"Safety & Security", icon:"shield",
     criteria:[
-      {id:"fire",label:"Fire Suppression / Sprinklers",score:0,notes:""}
+      {id:"crime",label:"Area Crime / Theft Risk",score:0,notes:""},
+      {id:"security",label:"Building Security Features",score:0,notes:""}
     ],
-    measurements:[{id:"sprinkler_type",label:"Sprinkler Type",value:""}],
+    measurements:[{id:"has_sprinklers",label:"Sprinklers Confirmed",value:"no"}],
     photos:[] },
   { id:"location", name:"Location", icon:"compass",
     criteria:[
@@ -486,6 +601,87 @@ function PhotoCapture({ photos, onAdd, onRemove, sectionName, storageQuota }) {
               <button className="photo-remove" onClick={() => onRemove(p.id)}>x</button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Tour Book Scanner ───
+function TourBookScanner({ onFieldsExtracted }) {
+  const fileRef = useRef(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [scanError, setScanError] = useState(null);
+
+  const handleScan = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setScanning(true);
+    setScanError(null);
+    setScanResult(null);
+    e.target.value = "";
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const worker = await Tesseract.createWorker("eng");
+          const { data } = await worker.recognize(ev.target.result);
+          await worker.terminate();
+
+          const parsed = parseTourBook(data.text);
+          setScanResult(parsed);
+          if (Object.keys(parsed).length === 0) {
+            setScanError("Could not extract data. Try a clearer photo or enter manually.");
+          }
+        } catch (err) {
+          setScanError("OCR failed: " + (err.message || "Unknown error"));
+        }
+        setScanning(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setScanError("Failed to read photo.");
+      setScanning(false);
+    }
+  };
+
+  const fieldLabels = {
+    parking: "Parking Spaces", clear_ft: "Clear Height (ft)", num_docks: "# Dock Doors",
+    num_drive: "# Drive-In Doors", amps: "Service (amps)", voltage: "Voltage",
+    office_sf: "Office SF", total_sf: "Total Warehouse SF", availableSF: "Available SF",
+    yearBuilt: "Year Built", hasSprinklers: "Sprinklers", col_space: "Column Spacing",
+    dock_ht: "Dock Height (in)", askingRate: "Asking Rate", slab_in: "Slab Thickness (in)"
+  };
+
+  return (
+    <div className="scan-card">
+      <h3><Icon name="camera" size={16} color="#1e40af"/> Scan Tour Book</h3>
+      <p style={{fontSize:12,color:"#4b5563",marginBottom:12}}>Take a photo of the property spec sheet to auto-fill fields.</p>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleScan} className="hidden" />
+      <button className="btn-scan" onClick={() => fileRef.current?.click()} disabled={scanning}>
+        <Icon name="camera" size={16} color="#fff" /> {scanning ? "Scanning..." : "Scan Tour Book Page"}
+      </button>
+      {scanning && (
+        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}>
+          <div className="loading-spinner" style={{width:20,height:20,borderWidth:2}}/>
+          <span style={{fontSize:13,color:"#4b5563"}}>Reading text from photo...</span>
+        </div>
+      )}
+      {scanError && <p style={{fontSize:12,color:"#dc2626",marginTop:8}}>{scanError}</p>}
+      {scanResult && Object.keys(scanResult).length > 0 && (
+        <div className="scan-result">
+          <p style={{fontSize:12,fontWeight:600,color:"#16a34a",marginBottom:8}}>Found {Object.keys(scanResult).length} fields:</p>
+          {Object.entries(scanResult).map(([k, v]) => (
+            <div key={k} className="scan-result-row">
+              <span className="label">{fieldLabels[k] || k}</span>
+              <span className="value">{v === true ? "Yes" : v}</span>
+            </div>
+          ))}
+          <button className="btn btn-primary" style={{marginTop:12}} onClick={() => { onFieldsExtracted(scanResult); setScanResult(null); }}>
+            Apply to Evaluation
+          </button>
         </div>
       )}
     </div>
@@ -590,6 +786,67 @@ function CustomizeModal({ sections, onSave, onClose }) {
   );
 }
 
+// ─── Market Rankings ───
+function MarketRankings() {
+  const [subs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("jetson_submissions") || "[]"); } catch(e) { return []; }
+  });
+  const [activeMarket, setActiveMarket] = useState(null);
+
+  if (subs.length === 0) return null;
+
+  // Group by market (city + state) then by date
+  const markets = {};
+  for (const s of subs) {
+    const key = (s.city && s.state) ? `${s.city}, ${s.state}` : "Other";
+    if (!markets[key]) markets[key] = {};
+    const dateKey = s.date || "Unknown Date";
+    if (!markets[key][dateKey]) markets[key][dateKey] = [];
+    markets[key][dateKey].push(s);
+  }
+
+  // Sort each date group by overall score descending
+  for (const mkt of Object.values(markets)) {
+    for (const dt of Object.keys(mkt)) {
+      mkt[dt].sort((a, b) => b.overallScore - a.overallScore);
+    }
+  }
+
+  const marketKeys = Object.keys(markets).sort();
+  const current = activeMarket || marketKeys[0];
+  const scoreClr = (v) => { if(v>=4) return "score-green"; if(v>=3) return "score-yellow"; if(v>=1) return "score-red"; return "score-gray"; };
+
+  return (
+    <div style={{marginBottom:20}}>
+      <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8}}>Market Rankings</h3>
+      <div className="rank-tabs">
+        {marketKeys.map(m => (
+          <button key={m} className={`rank-tab ${current===m?"active":""}`} onClick={() => setActiveMarket(m)}>{m}</button>
+        ))}
+      </div>
+      {current && markets[current] && Object.entries(markets[current])
+        .sort(([a], [b]) => b.localeCompare(a))
+        .map(([date, sites]) => (
+        <div key={date} className="rank-section">
+          <div className="rank-header">
+            <Icon name="compass" size={16} color="#2563eb"/> Tour: {date}
+          </div>
+          {sites.map((s, idx) => (
+            <div key={s.id} className="rank-item">
+              <div className={`rank-num ${scoreClr(s.overallScore)}`}>#{idx + 1}</div>
+              <div className="rank-info">
+                <div className="name">{s.propertyName}</div>
+                <div className="meta">{s.address}{s.evaluator ? ` · ${s.evaluator}` : ""}{s.gutScore > 0 ? ` · Gut: ${GUT_LABELS[s.gutScore]}` : ""}</div>
+              </div>
+              <div className={`rank-score ${scoreClr(s.overallScore)}`}>{s.overallScore}</div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Draft Picker ───
 function DraftPicker({ onResume, onNew, onDelete }) {
   const [drafts, setDrafts] = useState(EvalStorage.listDrafts());
@@ -641,6 +898,8 @@ function DraftPicker({ onResume, onNew, onDelete }) {
           </div>
         </div>
       )}
+
+      <MarketRankings />
 
       <button className="btn btn-primary" onClick={onNew}>
         <Icon name="plus" size={18} color="#fff"/> New Evaluation
@@ -1073,6 +1332,30 @@ function App() {
   };
 
   const handleSubmitted = async () => {
+    // Save submission record for rankings before deleting draft
+    try {
+      const allScored = sections.flatMap(s => s.criteria).filter(c => c.score > 0);
+      const overall = allScored.length ? (allScored.reduce((a,c) => a + c.score, 0) / allScored.length) : 0;
+      const record = {
+        id: "sub_" + Date.now(),
+        propertyName: site.propertyName || site.address || "Untitled",
+        address: site.address,
+        city: site.city,
+        state: site.state,
+        date: site.date,
+        evaluator: site.evaluator,
+        overallScore: parseFloat(overall.toFixed(1)),
+        gutScore: gutScore,
+        submittedAt: Date.now(),
+        sectionScores: sections.map(s => {
+          const scored = s.criteria.filter(c => c.score > 0);
+          return { name: s.name, avg: scored.length ? parseFloat((scored.reduce((a,c) => a + c.score, 0) / scored.length).toFixed(1)) : 0 };
+        })
+      };
+      const subs = JSON.parse(localStorage.getItem("jetson_submissions") || "[]");
+      subs.push(record);
+      localStorage.setItem("jetson_submissions", JSON.stringify(subs));
+    } catch (e) {}
     if (draftId) {
       await EvalStorage.deleteDraft(draftId);
     }
@@ -1120,6 +1403,31 @@ function App() {
       {/* Site Info */}
       {tab==="info" && (
         <div className="container" style={{paddingTop:20,paddingBottom:40}}>
+          <TourBookScanner onFieldsExtracted={(fields) => {
+            if (fields.availableSF) upSite("availableSF", fields.availableSF);
+            if (fields.yearBuilt) upSite("yearBuilt", fields.yearBuilt);
+            if (fields.askingRate) upSite("askingRate", fields.askingRate);
+            setSections(prev => {
+              const n = JSON.parse(JSON.stringify(prev));
+              const setMeas = (secId, measId, val) => {
+                const sec = n.find(s => s.id === secId);
+                if (sec) { const m = sec.measurements.find(x => x.id === measId); if (m) m.value = val; }
+              };
+              if (fields.parking) setMeas("exterior", "parking", fields.parking);
+              if (fields.num_docks) setMeas("dock", "num_docks", fields.num_docks);
+              if (fields.num_drive) setMeas("dock", "num_drive", fields.num_drive);
+              if (fields.dock_ht) setMeas("dock", "dock_ht", fields.dock_ht);
+              if (fields.clear_ft) setMeas("interior", "clear_ft", fields.clear_ft);
+              if (fields.col_space) setMeas("interior", "col_space", fields.col_space);
+              if (fields.total_sf) setMeas("interior", "total_sf", fields.total_sf);
+              if (fields.slab_in) setMeas("interior", "slab_in", fields.slab_in);
+              if (fields.amps) setMeas("electrical", "amps", fields.amps);
+              if (fields.voltage) setMeas("electrical", "voltage", fields.voltage);
+              if (fields.office_sf) setMeas("office", "office_sf", fields.office_sf);
+              if (fields.hasSprinklers) setMeas("safety", "has_sprinklers", "yes");
+              return n;
+            });
+          }} />
           <div className="card">
             <h2>Property</h2>
             <input placeholder="Property Name" value={site.propertyName} onChange={e=>upSite("propertyName",e.target.value)} style={{marginBottom:8}} />
@@ -1184,11 +1492,33 @@ function App() {
                 <h3><Icon name="ruler" size={16}/> Measurements</h3>
                 <div className="grid-2">
                   {s.measurements.map((m,mi)=>(
-                    <div key={m.id}><div className="measure-label">{m.label}</div>
-                    <input value={m.value} onChange={e=>upMeas(secIdx,mi,e.target.value)}/></div>
+                    m.id === "has_sprinklers" ? (
+                      <div key={m.id} style={{gridColumn:"1 / -1"}}>
+                        <div className="checkbox-row">
+                          <input type="checkbox" id="sprinkler-check" checked={m.value === "yes"} onChange={e=>upMeas(secIdx,mi,e.target.checked ? "yes" : "no")} />
+                          <label htmlFor="sprinkler-check">Sprinklers confirmed in warehouse</label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={m.id}><div className="measure-label">{m.label}</div>
+                      <input value={m.value} onChange={e=>upMeas(secIdx,mi,e.target.value)}/></div>
+                    )
                   ))}
                 </div>
               </div>
+              {s.id === "safety" && site.city && site.state && (
+                <div className="crime-card">
+                  <h3><Icon name="shield" size={16} color="#92400e"/> Area Crime Data</h3>
+                  <p style={{fontSize:12,color:"#78350f"}}>Review crime data for {site.city}, {site.state} to inform your safety rating:</p>
+                  <div className="crime-links">
+                    {getCrimeLinks(site.city, site.state, site.zip).map((link, i) => (
+                      <a key={i} href={link.url} target="_blank" rel="noopener">
+                        <Icon name="chevRight" size={14} color="#2563eb"/> {link.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="card">
                 <h3><Icon name="camera" size={16}/> Photos</h3>
                 <PhotoCapture photos={s.photos} sectionName={s.name} onAdd={ph=>addPhoto(secIdx,ph)} onRemove={id=>rmPhoto(secIdx,id)} storageQuota={storageQuota}/>
