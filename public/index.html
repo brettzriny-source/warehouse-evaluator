@@ -930,8 +930,8 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
   const margin = 40;
   const contentW = W - margin * 2;
   let y = margin;
-  const starChar = "\u2605";
-  const emptyStarChar = "\u2606";
+  const starChar = "*";
+  const emptyStarChar = "-";
 
   const checkPage = (needed) => { if (y + needed > 740) { doc.addPage(); y = margin; } };
 
@@ -986,7 +986,7 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
     doc.setFont("helvetica", "bold");
     doc.text(sec.name, margin + 6, y);
     const scored = sec.criteria.filter(c => c.score > 0);
-    const avg = scored.length ? (scored.reduce((a, c) => a + c.score, 0) / scored.length).toFixed(1) : "—";
+    const avg = scored.length ? (scored.reduce((a, c) => a + c.score, 0) / scored.length).toFixed(1) : "--";
     doc.setTextColor(107, 114, 128);
     doc.setFontSize(10);
     doc.text(`Avg: ${avg}/5`, W - margin - 6, y, { align: "right" });
@@ -1003,7 +1003,10 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
       const stars = (c.score > 0)
         ? starChar.repeat(c.score) + emptyStarChar.repeat(5 - c.score)
         : "Not rated";
-      doc.setTextColor(c.score >= 4 ? [22, 163, 74] : c.score >= 3 ? [202, 138, 4] : c.score >= 1 ? [220, 38, 38] : [156, 163, 175]);
+      if (c.score >= 4) doc.setTextColor(22, 163, 74);
+      else if (c.score >= 3) doc.setTextColor(202, 138, 4);
+      else if (c.score >= 1) doc.setTextColor(220, 38, 38);
+      else doc.setTextColor(156, 163, 175);
       doc.text(`${stars}  (${c.score}/5)`, W - margin - 6, y, { align: "right" });
       y += 13;
       if (c.notes) {
