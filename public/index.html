@@ -1602,6 +1602,20 @@ function App() {
       {/* Site Info */}
       {tab==="info" && (
         <div className="container" style={{paddingTop:20,paddingBottom:40}}>
+          <button className="btn" style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",marginBottom:16}} onClick={()=>{
+            if (window.confirm("Reset this evaluation? All scores, notes, photos, and site info will be cleared.")) {
+              setSite({...DEFAULT_SITE});
+              setSections(JSON.parse(JSON.stringify(DEFAULT_SECTIONS)));
+              setSketch(null);
+              setGutScore(0);
+              setGutNotes("");
+              setTiItems([]);
+              setMiscNotes("");
+              setSecIdx(0);
+            }
+          }}>
+            <Icon name="trash" size={16} color="#dc2626"/> Reset Evaluation
+          </button>
           <TourBookScanner onFieldsExtracted={(fields) => {
             if (fields.availableSF) upSite("availableSF", fields.availableSF);
             if (fields.yearBuilt) upSite("yearBuilt", fields.yearBuilt);
