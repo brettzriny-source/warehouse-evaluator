@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;color:#111827;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
@@ -469,6 +470,18 @@ function parseTourBook(text) {
   return result;
 }
 
+// ─── ZIP → City/State Lookup ───
+async function lookupZip(zip) {
+  try {
+    const res = await fetch(`https://api.zippopotam.us/us/${zip}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const place = data.places?.[0];
+    if (!place) return null;
+    return { city: place["place name"], state: place["state abbreviation"] };
+  } catch (e) { return null; }
+}
+
 // ─── Crime Data Lookup ───
 function getCrimeLinks(city, state, zip) {
   const links = [];
@@ -908,6 +921,192 @@ function DraftPicker({ onResume, onNew, onDelete }) {
   );
 }
 
+// ─── PDF Generation ───
+function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, tiItems, miscNotes) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const W = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  const contentW = W - margin * 2;
+  let y = margin;
+  const starChar = "\u2605";
+  const emptyStarChar = "\u2606";
+
+  const checkPage = (needed) => { if (y + needed > 740) { doc.addPage(); y = margin; } };
+
+  // ─ Header ─
+  doc.setFillColor(37, 99, 235);
+  doc.rect(0, 0, W, 80, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont("helvetica", "bold");
+  doc.text("Warehouse Site Evaluation", margin, 35);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text(siteInfo.propertyName || siteInfo.address || "Untitled Site", margin, 55);
+  doc.text(`Overall Score: ${overallScore}/5`, W - margin, 35, { align: "right" });
+  const dateStr = siteInfo.date || new Date().toISOString().slice(0, 10);
+  doc.text(`${dateStr}  |  ${siteInfo.evaluator || ""}`, W - margin, 55, { align: "right" });
+  y = 100;
+
+  // ─ Site Info ─
+  doc.setTextColor(30, 64, 175);
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text("Site Information", margin, y);
+  y += 18;
+  doc.setTextColor(55, 65, 81);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+
+  const siteRows = [
+    ["Address", [siteInfo.address, siteInfo.city, siteInfo.state, siteInfo.zip].filter(Boolean).join(", ")],
+    ["Landlord", siteInfo.landlord], ["Broker", siteInfo.broker],
+    ["Asking Rate", siteInfo.askingRate ? `$${siteInfo.askingRate}/SF` : ""],
+    ["Available SF", siteInfo.availableSF], ["Year Built", siteInfo.yearBuilt], ["Zoning", siteInfo.zoning]
+  ].filter(r => r[1]);
+  siteRows.forEach(([label, val]) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(label + ":", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(String(val), margin + 90, y);
+    y += 14;
+  });
+  y += 10;
+
+  // ─ Sections ─
+  sections.forEach(sec => {
+    checkPage(80);
+    // Section header
+    doc.setFillColor(243, 244, 246);
+    doc.rect(margin, y - 12, contentW, 18, "F");
+    doc.setTextColor(30, 64, 175);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(sec.name, margin + 6, y);
+    const scored = sec.criteria.filter(c => c.score > 0);
+    const avg = scored.length ? (scored.reduce((a, c) => a + c.score, 0) / scored.length).toFixed(1) : "—";
+    doc.setTextColor(107, 114, 128);
+    doc.setFontSize(10);
+    doc.text(`Avg: ${avg}/5`, W - margin - 6, y, { align: "right" });
+    y += 14;
+
+    // Criteria
+    doc.setFontSize(10);
+    sec.criteria.forEach(c => {
+      checkPage(30);
+      doc.setTextColor(55, 65, 81);
+      doc.setFont("helvetica", "normal");
+      doc.text(c.label, margin + 8, y);
+      // Stars
+      const stars = (c.score > 0)
+        ? starChar.repeat(c.score) + emptyStarChar.repeat(5 - c.score)
+        : "Not rated";
+      doc.setTextColor(c.score >= 4 ? [22, 163, 74] : c.score >= 3 ? [202, 138, 4] : c.score >= 1 ? [220, 38, 38] : [156, 163, 175]);
+      doc.text(`${stars}  (${c.score}/5)`, W - margin - 6, y, { align: "right" });
+      y += 13;
+      if (c.notes) {
+        checkPage(14);
+        doc.setTextColor(107, 114, 128);
+        doc.setFontSize(9);
+        const noteLines = doc.splitTextToSize("Notes: " + c.notes, contentW - 16);
+        doc.text(noteLines, margin + 16, y);
+        y += noteLines.length * 11;
+        doc.setFontSize(10);
+      }
+    });
+
+    // Measurements
+    const filledMeas = sec.measurements.filter(m => m.value && m.value !== "no");
+    if (filledMeas.length > 0) {
+      checkPage(20);
+      doc.setTextColor(107, 114, 128);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "italic");
+      const measStr = filledMeas.map(m => {
+        if (m.id === "has_sprinklers") return m.value === "yes" ? "Sprinklers: Yes" : null;
+        return `${m.label}: ${m.value}`;
+      }).filter(Boolean).join("  |  ");
+      doc.text(measStr, margin + 8, y);
+      y += 14;
+      doc.setFont("helvetica", "normal");
+    }
+    y += 8;
+  });
+
+  // ─ Gut Feel ─
+  if (gutScore > 0) {
+    checkPage(50);
+    doc.setTextColor(30, 64, 175);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Gut Feel", margin, y);
+    y += 16;
+    doc.setTextColor(55, 65, 81);
+    doc.setFontSize(11);
+    const labels = ["", "Pass", "Below Average", "Average", "Strong Contender", "Top Pick"];
+    doc.text(`${starChar.repeat(gutScore)}${emptyStarChar.repeat(5 - gutScore)}  ${labels[gutScore]}`, margin + 8, y);
+    y += 14;
+    if (gutNotes) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(gutNotes, contentW - 16);
+      doc.text(lines, margin + 8, y);
+      y += lines.length * 12 + 4;
+    }
+    y += 10;
+  }
+
+  // ─ TI Requests ─
+  const tiFiltered = (tiItems || []).filter(i => i.text);
+  if (tiFiltered.length > 0) {
+    checkPage(40);
+    doc.setTextColor(30, 64, 175);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("TI Requests", margin, y);
+    y += 16;
+    doc.setTextColor(55, 65, 81);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    tiFiltered.forEach((item, idx) => {
+      checkPage(20);
+      const line = `${idx + 1}. ${item.text}${item.est ? "  (" + item.est + ")" : ""}`;
+      const lines = doc.splitTextToSize(line, contentW - 16);
+      doc.text(lines, margin + 8, y);
+      y += lines.length * 12;
+    });
+    y += 10;
+  }
+
+  // ─ Misc Notes ─
+  if (miscNotes) {
+    checkPage(40);
+    doc.setTextColor(30, 64, 175);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Additional Notes", margin, y);
+    y += 16;
+    doc.setTextColor(55, 65, 81);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(miscNotes, contentW - 16);
+    doc.text(lines, margin + 8, y);
+    y += lines.length * 12;
+  }
+
+  // ─ Footer ─
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setTextColor(156, 163, 175);
+    doc.setFontSize(8);
+    doc.text(`Jetson Warehouse Evaluator  |  Page ${i} of ${pages}`, W / 2, 760, { align: "center" });
+  }
+
+  return doc;
+}
+
 // ─── Drive Upload Logic (Form-based, fully CORS-safe) ───
 function postViaForm(scriptUrl, payload, waitMs) {
   return new Promise((resolve, reject) => {
@@ -947,9 +1146,16 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
   completed++;
   onProgress({ step: "Creating folder & saving summary...", pct: Math.round((completed / totalSteps) * 100) });
 
+  // Generate PDF summary
+  const pdfDoc = generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, tiItems, miscNotes);
+  const pdfBase64 = pdfDoc.output("datauristring").split(",")[1];
+  const pdfFileName = `eval-${siteInfo.propertyName?.replace(/\s+/g,"-")||siteInfo.address?.replace(/\s+/g,"-")||"site"}-${new Date().toISOString().slice(0,10)}.pdf`;
+
   await postViaForm(scriptUrl, {
     action: "submit_evaluation",
     siteInfo,
+    pdfData: pdfBase64,
+    pdfFileName,
     sections: sections.map(s => ({
       name: s.name,
       criteria: s.criteria.map(c => ({ label: c.label, score: c.score, notes: c.notes })),
@@ -1011,16 +1217,9 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
   const totalPhotos = sections.reduce((a,s)=>a+s.photos.length,0);
   const scoreClr = (v) => { const n=parseFloat(v); if(n>=4) return "score-green"; if(n>=3) return "score-yellow"; if(n>=1) return "score-red"; return "score-gray"; };
 
-  const exportJSON = () => {
-    const data = { exportDate:new Date().toISOString(), siteInfo, overallScore:overall, gutFeelScore:gutScore, gutFeelNotes:gutNotes,
-      tiRequests:tiItems.filter(i=>i.text).map(i=>({description:i.text,estimatedCost:i.est})),
-      miscNotes,
-      sections:sections.map(s=>({name:s.name,criteria:s.criteria.map(c=>({label:c.label,score:c.score,notes:c.notes})),measurements:s.measurements.map(m=>({label:m.label,value:m.value})),photoCount:s.photos.length})),
-      hasSketch:!!sketchData };
-    const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `eval-${siteInfo.propertyName?.replace(/\s+/g,"-")||siteInfo.address?.replace(/\s+/g,"-")||"site"}-${new Date().toISOString().slice(0,10)}.json`;
-    a.click(); URL.revokeObjectURL(a.href);
+  const exportPDF = () => {
+    const doc = generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overall, tiItems, miscNotes);
+    doc.save(`eval-${siteInfo.propertyName?.replace(/\s+/g,"-")||siteInfo.address?.replace(/\s+/g,"-")||"site"}-${new Date().toISOString().slice(0,10)}.pdf`);
   };
 
   const handleSubmit = async () => {
@@ -1131,8 +1330,8 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
       <button className="btn btn-primary" style={{marginBottom:12}} onClick={()=>window.print()}>
         <Icon name="file" size={18} color="#fff"/> Print / Save as PDF
       </button>
-      <button className="btn btn-secondary" style={{marginBottom:12}} onClick={exportJSON}>
-        <Icon name="download" size={18} color="#2563eb"/> Export Data (JSON)
+      <button className="btn btn-secondary" style={{marginBottom:12}} onClick={exportPDF}>
+        <Icon name="download" size={18} color="#2563eb"/> Export PDF Report
       </button>
     </div>
   );
@@ -1435,7 +1634,21 @@ function App() {
             <div className="grid-3">
               <input placeholder="City" value={site.city} onChange={e=>upSite("city",e.target.value)} />
               <input placeholder="State" value={site.state} onChange={e=>upSite("state",e.target.value)} />
-              <input placeholder="ZIP" value={site.zip} onChange={e=>upSite("zip",e.target.value)} />
+              <input placeholder="ZIP" value={site.zip} onChange={e=>{
+                const val = e.target.value;
+                upSite("zip", val);
+                if (val.length === 5 && /^\d{5}$/.test(val)) {
+                  lookupZip(val).then(r => {
+                    if (r) {
+                      setSite(p => ({
+                        ...p,
+                        city: p.city || r.city,
+                        state: p.state || r.state
+                      }));
+                    }
+                  });
+                }
+              }} />
             </div>
           </div>
           <div className="card">
