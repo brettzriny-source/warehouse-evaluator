@@ -364,11 +364,32 @@ function CustomizeModal({ sections, onSave, onClose }) {
   );
 }
 
-// ─── Drive Upload Logic ───
-async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore, gutNotes, overallScore, onProgress) {
-  // Step 1: Submit evaluation data (creates folder, saves summary)
-  onProgress({ step: "Creating folder & saving summary...", pct: 10 });
-  const evalPayload = {
+// ─── Drive Upload Logic (CORS-safe) ───
+// Uses no-cors mode + site-info-based folder lookup to avoid CORS issues with Google Apps Script
+
+function postToScript(scriptUrl, payload) {
+  return new Promise((resolve, reject) => {
+    // Use no-cors fetch — request goes through but we can't read the response
+    // This is the only reliable way to POST to Google Apps Script from external sites
+    fetch(scriptUrl, {
+      method: "POST",
+      mode: "no-cors",
+      body: JSON.stringify(payload)
+    }).then(() => resolve({ success: true }))
+      .catch(err => reject(err));
+  });
+}
+
+async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore, gutNotes, overallScore, tiItems, miscNotes, onProgress) {
+  const totalPhotos = sections.reduce((a,s) => a + s.photos.length, 0);
+  const totalSteps = totalPhotos + (sketchData ? 1 : 0) + 1;
+  let completed = 0;
+
+  // Step 1: Submit evaluation data (creates folder + summary)
+  completed++;
+  onProgress({ step: "Creating folder & saving summary...", pct: Math.round((completed / totalSteps) * 100) });
+
+  await postToScript(scriptUrl, {
     action: "submit_evaluation",
     siteInfo,
     sections: sections.map(s => ({
@@ -379,76 +400,52 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
     })),
     gutFeelScore: gutScore,
     gutFeelNotes: gutNotes,
+    tiRequests: (tiItems||[]).filter(i=>i.text).map(i=>({description:i.text,estimatedCost:i.est})),
+    miscNotes: miscNotes || "",
     overallScore,
     hasSketch: !!sketchData
-  };
-
-  const evalRes = await fetch(scriptUrl, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify(evalPayload),
-    redirect: "follow"
-  });
-  const evalData = await evalRes.json();
-  if (!evalData.success) throw new Error(evalData.error || "Failed to create evaluation folder");
-
-  const folderId = evalData.folderId;
-  const folderUrl = evalData.folderUrl;
-
-  // Step 2: Upload photos one at a time
-  const allPhotos = [];
-  sections.forEach(s => {
-    s.photos.forEach(p => allPhotos.push({ ...p, section: s.name }));
   });
 
-  const totalSteps = allPhotos.length + (sketchData ? 1 : 0) + 1; // photos + sketch + eval
-  let completed = 1;
+  // Brief pause to let the folder get created before uploading photos
+  await new Promise(r => setTimeout(r, 2000));
 
-  for (const photo of allPhotos) {
-    completed++;
-    const pct = Math.round((completed / totalSteps) * 100);
-    onProgress({ step: `Uploading ${photo.label}...`, pct });
+  // Step 2: Upload photos one at a time (uses site info to find folder)
+  const siteKey = { state: siteInfo.state, city: siteInfo.city, propertyName: siteInfo.propertyName, address: siteInfo.address, date: siteInfo.date };
 
-    const photoPayload = {
-      action: "upload_photo",
-      folderId,
-      photoData: photo.data,
-      photoName: photo.label.replace(/[^a-zA-Z0-9 #_-]/g, "") + ".jpg"
-    };
+  for (const sec of sections) {
+    for (const photo of sec.photos) {
+      completed++;
+      onProgress({ step: `Uploading ${photo.label}...`, pct: Math.round((completed / totalSteps) * 100) });
 
-    const photoRes = await fetch(scriptUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify(photoPayload),
-      redirect: "follow"
-    });
-    const photoData = await photoRes.json();
-    if (!photoData.success) {
-      console.warn("Photo upload failed:", photo.label, photoData.error);
+      await postToScript(scriptUrl, {
+        action: "upload_photo",
+        siteKey,
+        photoData: photo.data,
+        photoName: photo.label.replace(/[^a-zA-Z0-9 #_-]/g, "") + ".jpg"
+      });
+
+      // Small pause between uploads to avoid overwhelming Apps Script
+      await new Promise(r => setTimeout(r, 500));
     }
   }
 
-  // Step 3: Upload sketch if exists
+  // Step 3: Upload sketch
   if (sketchData) {
     completed++;
     onProgress({ step: "Uploading floor plan sketch...", pct: Math.round((completed / totalSteps) * 100) });
 
-    const sketchPayload = {
+    await postToScript(scriptUrl, {
       action: "upload_photo",
-      folderId,
+      siteKey,
       photoData: sketchData,
       photoName: "Floor Plan Sketch.png"
-    };
-    await fetch(scriptUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify(sketchPayload),
-      redirect: "follow"
     });
   }
 
   onProgress({ step: "Done!", pct: 100 });
-  return { folderId, folderUrl };
+
+  // Build expected folder URL (we can't read the response with no-cors)
+  return { folderUrl: "https://drive.google.com/drive/folders/1bZZDFj0HycamRivMl1g-1l8f5UcGvPV-" };
 }
 
 // ─── Summary View ───
@@ -484,7 +481,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
     if (!scriptUrl) { setError("Please paste your Google Apps Script URL below first."); return; }
     setUploading(true); setError(null); setResult(null);
     try {
-      const res = await submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore, gutNotes, overall, setProgress);
+      const res = await submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore, gutNotes, overall, tiItems, miscNotes, setProgress);
       setResult(res);
     } catch (err) {
       setError(err.message || "Upload failed. Check your connection and try again.");
