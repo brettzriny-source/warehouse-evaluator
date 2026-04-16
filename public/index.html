@@ -17,7 +17,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;color:#111827;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
 input,textarea,select,button{font-family:inherit;font-size:14px}
-input,textarea,select{-webkit-appearance:none;border-radius:8px;border:1px solid #d1d5db;padding:10px 12px;width:100%;background:#fff}
+input:not([type="checkbox"]),textarea,select{-webkit-appearance:none;border-radius:8px;border:1px solid #d1d5db;padding:10px 12px;width:100%;background:#fff}
 input:focus,textarea:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.15)}
 button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .container{max-width:500px;margin:0 auto;padding:0 16px}
@@ -1363,8 +1363,9 @@ function App() {
   const addTI = () => setTiItems(p=>[...p,{id:Date.now(),text:"",est:""}]);
   const updateTI = (id,k,v) => setTiItems(p=>p.map(i=>i.id===id?{...i,[k]:v}:i));
   const removeTI = (id) => setTiItems(p=>p.filter(i=>i.id!==id));
+  const DEFAULT_SCRIPT_URL = "https://script.google.com/a/macros/jetsonhome.com/s/AKfycbzaITlc2DcKQIPds8YoNfwBUtkPDUZr3wCvyGAD5hIN23KPHRocMjha2o1hnl7ZmqDy/exec";
   const [scriptUrl, setScriptUrl] = useState(() => {
-    try { return window.localStorage?.getItem("jetson_script_url") || ""; } catch(e) { return ""; }
+    try { return window.localStorage?.getItem("jetson_script_url") || DEFAULT_SCRIPT_URL; } catch(e) { return DEFAULT_SCRIPT_URL; }
   });
   const handleSetScriptUrl = (url) => {
     setScriptUrl(url);
