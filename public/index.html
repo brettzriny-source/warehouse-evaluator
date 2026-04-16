@@ -364,19 +364,47 @@ function CustomizeModal({ sections, onSave, onClose }) {
   );
 }
 
-// ─── Drive Upload Logic (CORS-safe) ───
-// Uses no-cors mode + site-info-based folder lookup to avoid CORS issues with Google Apps Script
+// ─── Drive Upload Logic (Form-based, fully CORS-safe) ───
+// Uses hidden form + iframe to POST to Google Apps Script
+// This bypasses CORS entirely since HTML form submissions are exempt from same-origin policy
 
-function postToScript(scriptUrl, payload) {
+function postViaForm(scriptUrl, payload, waitMs) {
   return new Promise((resolve, reject) => {
-    // Use no-cors fetch — request goes through but we can't read the response
-    // This is the only reliable way to POST to Google Apps Script from external sites
-    fetch(scriptUrl, {
-      method: "POST",
-      mode: "no-cors",
-      body: JSON.stringify(payload)
-    }).then(() => resolve({ success: true }))
-      .catch(err => reject(err));
+    try {
+      const id = "gas_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+
+      // Create hidden iframe to receive the response
+      const iframe = document.createElement("iframe");
+      iframe.name = id;
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+
+      // Create form targeting the iframe
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = scriptUrl;
+      form.target = id;
+      form.style.display = "none";
+
+      // Put JSON payload in a hidden input
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "payload";
+      input.value = JSON.stringify(payload);
+      form.appendChild(input);
+
+      document.body.appendChild(form);
+      form.submit();
+
+      // Clean up and resolve after wait time
+      setTimeout(() => {
+        try { form.remove(); iframe.remove(); } catch(e) {}
+        resolve({ success: true });
+      }, waitMs || 3000);
+
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -389,7 +417,7 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
   completed++;
   onProgress({ step: "Creating folder & saving summary...", pct: Math.round((completed / totalSteps) * 100) });
 
-  await postToScript(scriptUrl, {
+  await postViaForm(scriptUrl, {
     action: "submit_evaluation",
     siteInfo,
     sections: sections.map(s => ({
@@ -404,10 +432,7 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
     miscNotes: miscNotes || "",
     overallScore,
     hasSketch: !!sketchData
-  });
-
-  // Brief pause to let the folder get created before uploading photos
-  await new Promise(r => setTimeout(r, 2000));
+  }, 5000);
 
   // Step 2: Upload photos one at a time (uses site info to find folder)
   const siteKey = { state: siteInfo.state, city: siteInfo.city, propertyName: siteInfo.propertyName, address: siteInfo.address, date: siteInfo.date };
@@ -417,15 +442,12 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
       completed++;
       onProgress({ step: `Uploading ${photo.label}...`, pct: Math.round((completed / totalSteps) * 100) });
 
-      await postToScript(scriptUrl, {
+      await postViaForm(scriptUrl, {
         action: "upload_photo",
         siteKey,
         photoData: photo.data,
         photoName: photo.label.replace(/[^a-zA-Z0-9 #_-]/g, "") + ".jpg"
-      });
-
-      // Small pause between uploads to avoid overwhelming Apps Script
-      await new Promise(r => setTimeout(r, 500));
+      }, 4000);
     }
   }
 
@@ -434,17 +456,15 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
     completed++;
     onProgress({ step: "Uploading floor plan sketch...", pct: Math.round((completed / totalSteps) * 100) });
 
-    await postToScript(scriptUrl, {
+    await postViaForm(scriptUrl, {
       action: "upload_photo",
       siteKey,
       photoData: sketchData,
       photoName: "Floor Plan Sketch.png"
-    });
+    }, 4000);
   }
 
   onProgress({ step: "Done!", pct: 100 });
-
-  // Build expected folder URL (we can't read the response with no-cors)
   return { folderUrl: "https://drive.google.com/drive/folders/1bZZDFj0HycamRivMl1g-1l8f5UcGvPV-" };
 }
 
