@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Site Eval">
+<meta name="theme-color" content="#1e40af">
+<title>Warehouse Site Evaluator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;color:#111827;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
+input,textarea,select,button{font-family:inherit;font-size:14px}
+input,textarea,select{-webkit-appearance:none;border-radius:8px;border:1px solid #d1d5db;padding:10px 12px;width:100%;background:#fff}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.15)}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.container{max-width:500px;margin:0 auto;padding:0 16px}
+.header{background:#fff;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:40;padding-top:env(safe-area-inset-top)}
+.header-inner{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;max-width:500px;margin:0 auto}
+.header h1{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px}
+.badge{font-size:11px;background:#dbeafe;color:#1d4ed8;padding:3px 8px;border-radius:999px;font-weight:600}
+.settings-btn{padding:8px;border-radius:8px;background:none;border:none}
+.settings-btn:active{background:#f3f4f6}
+.tabs{display:flex;max-width:500px;margin:0 auto;padding:0 8px}
+.tab{flex:1;padding:10px 0;text-align:center;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:#6b7280;transition:all 0.2s}
+.tab.active{border-bottom-color:#2563eb;color:#2563eb}
+.card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px}
+.card h2{font-size:15px;font-weight:700;color:#1f2937;margin-bottom:12px}
+.card h3{font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stars{display:flex;gap:4px}
+.star-btn{padding:2px;background:none;border:none;line-height:0}
+.star-btn svg{width:28px;height:28px}
+.criterion{padding:12px;border-bottom:1px solid #f3f4f6}
+.criterion:last-child{border-bottom:none}
+.criterion-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.criterion-label{font-size:14px;font-weight:500;color:#1f2937;flex:1;padding-top:4px}
+.criterion input{background:#f9fafb;font-size:13px;padding:8px 10px}
+.section-pills{display:flex;gap:6px;overflow-x:auto;padding:0 0 8px;-webkit-overflow-scrolling:touch}
+.section-pills::-webkit-scrollbar{display:none}
+.pill{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 10px;border-radius:12px;font-size:10px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#4b5563;white-space:nowrap}
+.pill.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.pill.done{background:#f0fdf4;color:#15803d;border-color:#bbf7d0}
+.pill svg{width:16px;height:16px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;font-size:14px;font-weight:600;border:none;width:100%}
+.btn-primary{background:#2563eb;color:#fff}
+.btn-primary:active{background:#1d4ed8}
+.btn-secondary{background:#fff;color:#2563eb;border:2px solid #2563eb}
+.btn-secondary:active{background:#eff6ff}
+.btn-photo{background:#2563eb;color:#fff;padding:10px 16px;border-radius:8px;width:auto;font-size:13px;display:flex;align-items:center;gap:6px}
+.btn-photo:active{background:#1d4ed8}
+.btn-nav{flex:1}
+.nav-row{display:flex;gap:12px;margin-top:16px}
+.photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.photo-thumb{position:relative;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb}
+.photo-thumb img{width:100%;height:100px;object-fit:cover;display:block}
+.photo-thumb .photo-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-remove{position:absolute;top:4px;right:4px;background:#ef4444;color:#fff;border:none;border-radius:999px;width:22px;height:22px;font-size:14px;line-height:22px;text-align:center;padding:0}
+.canvas-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.tool-btn{padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;border:none;background:#f3f4f6;color:#374151}
+.tool-btn.active{background:#2563eb;color:#fff}
+.tool-btn.danger{background:#fef2f2;color:#dc2626}
+.canvas-wrap{border:2px solid #e5e7eb;border-radius:12px;overflow:hidden;touch-action:none}
+.canvas-wrap canvas{width:100%;display:block}
+.score-hero{background:linear-gradient(135deg,#2563eb,#1e3a8a);border-radius:16px;padding:24px;color:#fff;text-align:center;margin-bottom:12px}
+.score-hero .label{font-size:12px;text-transform:uppercase;letter-spacing:1px;opacity:0.8}
+.score-hero .big{font-size:48px;font-weight:800;margin:4px 0}
+.score-hero .sub{font-size:12px;opacity:0.8}
+.score-row{display:flex;align-items:center;justify-content:space-between;padding:12px;background:#fff;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:6px}
+.score-row .name{font-size:13px;font-weight:500}
+.score-row .detail{font-size:11px;color:#6b7280}
+.score-bar-wrap{display:flex;align-items:center;gap:8px}
+.score-bar{width:80px;height:6px;background:#f3f4f6;border-radius:999px;overflow:hidden}
+.score-bar-fill{height:100%;background:#3b82f6;border-radius:999px}
+.score-num{font-size:18px;font-weight:700;min-width:28px;text-align:right}
+.score-green{color:#16a34a}.score-yellow{color:#ca8a04}.score-red{color:#dc2626}.score-gray{color:#9ca3af}
+.flags{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin-bottom:12px}
+.flags h3{font-size:13px;font-weight:600;color:#b91c1c;margin-bottom:8px}
+.flag-item{font-size:13px;color:#991b1b;padding:6px 0;border-bottom:1px solid #fecaca}
+.flag-item:last-child{border:none}
+.flag-item .flag-note{font-size:11px;color:#dc2626;margin-top:2px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:#fff;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px}
+.modal h2{font-size:18px;font-weight:700}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-close{background:none;border:none;font-size:24px;padding:4px}
+.modal-section{margin-bottom:20px}
+.modal-section h3{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.modal-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.modal-row input{flex:1}
+.modal-remove{padding:6px;background:none;border:none;color:#ef4444}
+.modal-add{background:none;border:none;color:#2563eb;font-size:13px;font-weight:600;padding:4px 0;display:flex;align-items:center;gap:4px}
+.modal-actions{display:flex;gap:12px;margin-top:16px}
+.modal-actions button{flex:1;padding:12px;border-radius:8px;font-size:14px;font-weight:600}
+.modal-cancel{background:#fff;border:1px solid #d1d5db;color:#374151}
+.modal-save{background:#2563eb;border:none;color:#fff}
+.measure-label{font-size:11px;color:#6b7280;margin-bottom:2px}
+.text-xs{font-size:12px;color:#6b7280;text-align:center;margin-top:8px}
+.hidden{display:none}
+.flex-center{display:flex;align-items:center;gap:6px}
+.submit-progress{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px}
+.submit-progress .prog-bar{width:100%;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:8px 0}
+.submit-progress .prog-fill{height:100%;background:#2563eb;border-radius:999px;transition:width 0.3s}
+.submit-progress .prog-text{font-size:13px;color:#4b5563}
+.submit-progress .prog-status{font-size:12px;color:#6b7280;margin-top:4px}
+.btn-submit{background:#16a34a;color:#fff}
+.btn-submit:active{background:#15803d}
+.btn-submit:disabled{background:#9ca3af;cursor:not-allowed}
+.success-banner{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:12px;text-align:center}
+.success-banner a{color:#2563eb;font-weight:600;text-decoration:underline}
+.config-card{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px;margin-bottom:12px}
+.config-card h3{font-size:14px;font-weight:600;color:#92400e;margin-bottom:8px}
+.config-card p{font-size:13px;color:#78350f;margin-bottom:8px}
+.config-card input{font-size:12px}
+.gut-feel-area{text-align:center;padding:20px 0}
+.gut-feel-stars{display:flex;justify-content:center;gap:8px;margin:16px 0}
+.gut-feel-stars .star-btn svg{width:40px;height:40px}
+.gut-feel-label{font-size:24px;font-weight:700;color:#1f2937;margin-top:8px}
+@media print{.sticky,button,input[type="file"],.header,.section-pills,.nav-row{display:none!important}body{font-size:12px}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+// ─── SVG Icons ───
+const Icon = ({ name, size = 20, color = "currentColor" }) => {
+  const icons = {
+    building: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>,
+    mapPin: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+    truck: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 13.52 9H12"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>,
+    zap: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+    shield: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+    clipboard: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>,
+    compass: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
+    heart: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+    camera: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+    ruler: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/></svg>,
+    star: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+    starFill: <svg width={size} height={size} viewBox="0 0 24 24" fill="#facc15" stroke="#facc15" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+    settings: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>,
+    chevRight: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+    chevLeft: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+    x: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+    plus: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    trash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>,
+    pencil: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
+    download: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+    upload: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+    wrench: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
+    file: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+  };
+  return icons[name] || null;
+};
+
+// ─── Simplified Sections ───
+const DEFAULT_SECTIONS = [
+  { id:"exterior", name:"Exterior & Access", icon:"mapPin",
+    criteria:[
+      {id:"truck_parking",label:"Truck Access & Parking",score:0,notes:""},
+      {id:"lot_condition",label:"Lot Condition & Drainage",score:0,notes:""},
+      {id:"signage",label:"Signage & Visibility",score:0,notes:""},
+      {id:"perimeter",label:"Perimeter Security",score:0,notes:""}
+    ],
+    measurements:[{id:"lot_size",label:"Lot Size (acres)",value:""},{id:"parking",label:"Parking Spaces",value:""}],
+    photos:[] },
+  { id:"dock", name:"Dock & Loading", icon:"truck",
+    criteria:[
+      {id:"docks",label:"Dock Doors (Count & Condition)",score:0,notes:""}
+    ],
+    measurements:[{id:"num_docks",label:"# Dock Doors",value:""},{id:"num_drive",label:"# Drive-In Doors",value:""},{id:"dock_ht",label:"Dock Height (in)",value:""}],
+    photos:[] },
+  { id:"interior", name:"Interior Structure", icon:"building",
+    criteria:[
+      {id:"clear_ht",label:"Clear Height",score:0,notes:""},
+      {id:"columns",label:"Column Spacing",score:0,notes:""},
+      {id:"concrete",label:"Concrete Thickness",score:0,notes:""},
+      {id:"roof",label:"Roof Condition",score:0,notes:""}
+    ],
+    measurements:[{id:"clear_ft",label:"Clear Height (ft)",value:""},{id:"col_space",label:"Column Spacing (ft×ft)",value:""},{id:"total_sf",label:"Total Warehouse SF",value:""},{id:"slab_in",label:"Slab Thickness (in)",value:""}],
+    photos:[] },
+  { id:"electrical", name:"Electrical & Utilities", icon:"zap",
+    criteria:[
+      {id:"power",label:"Power Capacity",score:0,notes:""},
+      {id:"lighting",label:"Lighting",score:0,notes:""},
+      {id:"hvac",label:"HVAC",score:0,notes:""}
+    ],
+    measurements:[{id:"amps",label:"Service (amps)",value:""},{id:"voltage",label:"Voltage",value:""}],
+    photos:[] },
+  { id:"office", name:"Office & Amenities", icon:"clipboard",
+    criteria:[
+      {id:"office",label:"Office Space",score:0,notes:""},
+      {id:"restrooms",label:"Restrooms",score:0,notes:""},
+      {id:"break",label:"Break Room / Kitchen",score:0,notes:""}
+    ],
+    measurements:[{id:"office_sf",label:"Office SF",value:""}],
+    photos:[] },
+  { id:"safety", name:"Safety", icon:"shield",
+    criteria:[
+      {id:"fire",label:"Fire Suppression / Sprinklers",score:0,notes:""}
+    ],
+    measurements:[{id:"sprinkler_type",label:"Sprinkler Type",value:""}],
+    photos:[] },
+  { id:"location", name:"Location", icon:"compass",
+    criteria:[
+      {id:"highway",label:"Highway / Freeway Access",score:0,notes:""},
+      {id:"neighborhood",label:"Surrounding Area & Neighbors",score:0,notes:""},
+      {id:"labor",label:"Labor Market / Workforce Access",score:0,notes:""}
+    ],
+    measurements:[{id:"dist_highway",label:"Miles to Highway",value:""}],
+    photos:[] },
+];
+
+// ─── Star Rating ───
+function StarRating({ score, onChange, large }) {
+  return (
+    <div className={large ? "gut-feel-stars" : "stars"}>
+      {[1,2,3,4,5].map(s => (
+        <button key={s} className="star-btn" onClick={() => onChange(s === score ? 0 : s)}>
+          <Icon name={s <= score ? "starFill" : "star"} size={large ? 40 : 28} color={s <= score ? "#facc15" : "#d1d5db"} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const GUT_LABELS = ["","Pass","Below Average","Average","Strong Contender","Top Pick"];
+
+// ─── Photo Capture ───
+function PhotoCapture({ photos, onAdd, onRemove, sectionName }) {
+  const fileRef = useRef(null);
+  const handleCapture = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      onAdd({ id: Date.now(), data: ev.target.result, label: sectionName + " #" + (photos.length + 1), timestamp: new Date().toLocaleString() });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+  return (
+    <div>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+      <button className="btn-photo" onClick={() => fileRef.current?.click()}>
+        <Icon name="camera" size={16} color="#fff" /> Take Photo
+      </button>
+      {photos.length > 0 && (
+        <div className="photos-grid">
+          {photos.map(p => (
+            <div key={p.id} className="photo-thumb">
+              <img src={p.data} alt={p.label} />
+              <div className="photo-label">{p.label}</div>
+              <button className="photo-remove" onClick={() => onRemove(p.id)}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sketch Canvas ───
+function SketchCanvas({ sketchData, onSave }) {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [tool, setTool] = useState("pen");
+  const [color, setColor] = useState("#1e40af");
+  const [lineWidth, setLineWidth] = useState(3);
+  const lastPos = useRef(null);
+
+  useEffect(() => {
+    const c = canvasRef.current; if (!c) return;
+    const ctx = c.getContext("2d");
+    c.width = c.offsetWidth * 2; c.height = 600;
+    ctx.scale(2, 1);
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 0.5;
+    for (let x = 0; x < c.width/2; x += 20) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,c.height); ctx.stroke(); }
+    for (let y = 0; y < c.height; y += 20) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(c.width/2,y); ctx.stroke(); }
+    if (sketchData) { const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0, c.width/2, c.height); img.src = sketchData; }
+  }, []);
+
+  const getPos = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX - rect.left), y: (t.clientY - rect.top) * (600 / rect.height) };
+  };
+  const startDraw = (e) => { e.preventDefault(); setIsDrawing(true); lastPos.current = getPos(e); };
+  const draw = (e) => {
+    if (!isDrawing) return; e.preventDefault();
+    const ctx = canvasRef.current.getContext("2d");
+    const pos = getPos(e);
+    ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = tool === "eraser" ? "#fff" : color;
+    ctx.lineWidth = tool === "eraser" ? 20 : lineWidth;
+    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
+    lastPos.current = pos;
+  };
+  const endDraw = () => { if (isDrawing) { setIsDrawing(false); onSave(canvasRef.current.toDataURL()); } };
+  const clearCanvas = () => {
+    const c = canvasRef.current; const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 0.5;
+    for (let x = 0; x < c.width/2; x += 20) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,c.height); ctx.stroke(); }
+    for (let y = 0; y < c.height; y += 20) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(c.width/2,y); ctx.stroke(); }
+    onSave(null);
+  };
+
+  return (
+    <div>
+      <div className="canvas-tools">
+        <button className={`tool-btn ${tool==="pen"?"active":""}`} onClick={()=>setTool("pen")}>✏️ Pen</button>
+        <button className={`tool-btn ${tool==="eraser"?"active":""}`} onClick={()=>setTool("eraser")}>Eraser</button>
+        <select value={lineWidth} onChange={e=>setLineWidth(Number(e.target.value))} style={{width:"auto",padding:"6px 8px",fontSize:"13px"}}>
+          <option value={2}>Thin</option><option value={3}>Medium</option><option value={5}>Thick</option>
+        </select>
+        <input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{width:32,height:32,padding:0,border:"none",borderRadius:6,cursor:"pointer"}} />
+        <button className="tool-btn danger" onClick={clearCanvas} style={{marginLeft:"auto"}}>↺ Clear</button>
+      </div>
+      <div className="canvas-wrap">
+        <canvas ref={canvasRef} style={{height:300}}
+          onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
+          onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Customize Modal ───
+function CustomizeModal({ sections, onSave, onClose }) {
+  const [ed, setEd] = useState(JSON.parse(JSON.stringify(sections)));
+  const addC = (si) => { const u=[...ed]; u[si].criteria.push({id:"c_"+Date.now(),label:"New Criterion",score:0,notes:""}); setEd(u); };
+  const rmC = (si,ci) => { const u=[...ed]; u[si].criteria.splice(ci,1); setEd(u); };
+  const upC = (si,ci,v) => { const u=[...ed]; u[si].criteria[ci].label=v; setEd(u); };
+  return (
+    <div className="modal-overlay" onClick={(e)=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="modal">
+        <div className="modal-header"><h2>Customize Checklist</h2><button className="modal-close" onClick={onClose}>×</button></div>
+        {ed.map((s,si) => (
+          <div key={s.id} className="modal-section">
+            <h3>{s.name}</h3>
+            {s.criteria.map((c,ci) => (
+              <div key={c.id} className="modal-row">
+                <input value={c.label} onChange={e=>upC(si,ci,e.target.value)} />
+                <button className="modal-remove" onClick={()=>rmC(si,ci)}><Icon name="trash" size={16} color="#ef4444"/></button>
+              </div>
+            ))}
+            <button className="modal-add" onClick={()=>addC(si)}><Icon name="plus" size={14} color="#2563eb"/> Add</button>
+          </div>
+        ))}
+        <div className="modal-actions">
+          <button className="modal-cancel" onClick={onClose}>Cancel</button>
+          <button className="modal-save" onClick={()=>onSave(ed)}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Drive Upload Logic ───
+async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore, gutNotes, overallScore, onProgress) {
+  // Step 1: Submit evaluation data (creates folder, saves summary)
+  onProgress({ step: "Creating folder & saving summary...", pct: 10 });
+  const evalPayload = {
+    action: "submit_evaluation",
+    siteInfo,
+    sections: sections.map(s => ({
+      name: s.name,
+      criteria: s.criteria.map(c => ({ label: c.label, score: c.score, notes: c.notes })),
+      measurements: s.measurements.map(m => ({ label: m.label, value: m.value })),
+      photoCount: s.photos.length
+    })),
+    gutFeelScore: gutScore,
+    gutFeelNotes: gutNotes,
+    overallScore,
+    hasSketch: !!sketchData
+  };
+
+  const evalRes = await fetch(scriptUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(evalPayload),
+    redirect: "follow"
+  });
+  const evalData = await evalRes.json();
+  if (!evalData.success) throw new Error(evalData.error || "Failed to create evaluation folder");
+
+  const folderId = evalData.folderId;
+  const folderUrl = evalData.folderUrl;
+
+  // Step 2: Upload photos one at a time
+  const allPhotos = [];
+  sections.forEach(s => {
+    s.photos.forEach(p => allPhotos.push({ ...p, section: s.name }));
+  });
+
+  const totalSteps = allPhotos.length + (sketchData ? 1 : 0) + 1; // photos + sketch + eval
+  let completed = 1;
+
+  for (const photo of allPhotos) {
+    completed++;
+    const pct = Math.round((completed / totalSteps) * 100);
+    onProgress({ step: `Uploading ${photo.label}...`, pct });
+
+    const photoPayload = {
+      action: "upload_photo",
+      folderId,
+      photoData: photo.data,
+      photoName: photo.label.replace(/[^a-zA-Z0-9 #_-]/g, "") + ".jpg"
+    };
+
+    const photoRes = await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(photoPayload),
+      redirect: "follow"
+    });
+    const photoData = await photoRes.json();
+    if (!photoData.success) {
+      console.warn("Photo upload failed:", photo.label, photoData.error);
+    }
+  }
+
+  // Step 3: Upload sketch if exists
+  if (sketchData) {
+    completed++;
+    onProgress({ step: "Uploading floor plan sketch...", pct: Math.round((completed / totalSteps) * 100) });
+
+    const sketchPayload = {
+      action: "upload_photo",
+      folderId,
+      photoData: sketchData,
+      photoName: "Floor Plan Sketch.png"
+    };
+    await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(sketchPayload),
+      redirect: "follow"
+    });
+  }
+
+  onProgress({ step: "Done!", pct: 100 });
+  return { folderId, folderUrl };
+}
+
+// ─── Summary View ───
+function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiItems, miscNotes, onSetMiscNotes, scriptUrl, onSetScriptUrl }) {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState({ step: "", pct: 0 });
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const sScores = sections.map(s => {
+    const scored = s.criteria.filter(c=>c.score>0);
+    const avg = scored.length ? (scored.reduce((a,c)=>a+c.score,0)/scored.length) : 0;
+    return { name:s.name, avg:avg.toFixed(1), scored:scored.length, total:s.criteria.length };
+  });
+  const allScored = sections.flatMap(s=>s.criteria).filter(c=>c.score>0);
+  const overall = allScored.length ? (allScored.reduce((a,c)=>a+c.score,0)/allScored.length).toFixed(1) : "—";
+  const totalPhotos = sections.reduce((a,s)=>a+s.photos.length,0);
+  const scoreClr = (v) => { const n=parseFloat(v); if(n>=4) return "score-green"; if(n>=3) return "score-yellow"; if(n>=1) return "score-red"; return "score-gray"; };
+
+  const exportJSON = () => {
+    const data = { exportDate:new Date().toISOString(), siteInfo, overallScore:overall, gutFeelScore:gutScore, gutFeelNotes:gutNotes,
+      tiRequests:tiItems.filter(i=>i.text).map(i=>({description:i.text,estimatedCost:i.est})),
+      miscNotes,
+      sections:sections.map(s=>({name:s.name,criteria:s.criteria.map(c=>({label:c.label,score:c.score,notes:c.notes})),measurements:s.measurements.map(m=>({label:m.label,value:m.value})),photoCount:s.photos.length})),
+      hasSketch:!!sketchData };
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `eval-${siteInfo.propertyName?.replace(/\s+/g,"-")||siteInfo.address?.replace(/\s+/g,"-")||"site"}-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  const handleSubmit = async () => {
+    if (!scriptUrl) { setError("Please paste your Google Apps Script URL below first."); return; }
+    setUploading(true); setError(null); setResult(null);
+    try {
+      const res = await submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore, gutNotes, overall, setProgress);
+      setResult(res);
+    } catch (err) {
+      setError(err.message || "Upload failed. Check your connection and try again.");
+    }
+    setUploading(false);
+  };
+
+  const flags = sections.flatMap(s=>s.criteria.filter(c=>c.score>0&&c.score<=2).map(c=>({section:s.name,...c})));
+
+  return (
+    <div className="container" style={{paddingTop:20,paddingBottom:40}}>
+      <div className="score-hero">
+        <div className="label">Overall Score</div>
+        <div className="big">{overall}</div>
+        <div className="sub">{allScored.length} of {sections.flatMap(s=>s.criteria).length} criteria · {totalPhotos} photos{gutScore > 0 ? ` · Gut feel: ${GUT_LABELS[gutScore]}` : ""}</div>
+      </div>
+      {gutScore > 0 && (
+        <div className="card" style={{textAlign:"center"}}>
+          <h2 style={{marginBottom:4}}>Gut Feel: {GUT_LABELS[gutScore]}</h2>
+          <div style={{display:"flex",justifyContent:"center",gap:4,margin:"8px 0"}}>
+            {[1,2,3,4,5].map(s=><Icon key={s} name={s<=gutScore?"starFill":"star"} size={24} color={s<=gutScore?"#facc15":"#d1d5db"}/>)}
+          </div>
+          {gutNotes && <p style={{fontSize:13,color:"#4b5563",marginTop:8}}>{gutNotes}</p>}
+        </div>
+      )}
+      <div style={{marginBottom:16}}>
+        <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8}}>Section Breakdown</h3>
+        {sScores.map(s => (
+          <div key={s.name} className="score-row">
+            <div><div className="name">{s.name}</div><div className="detail">{s.scored}/{s.total} scored</div></div>
+            <div className="score-bar-wrap">
+              <div className="score-bar"><div className="score-bar-fill" style={{width:(parseFloat(s.avg)/5*100)+"%"}}/></div>
+              <div className={`score-num ${scoreClr(s.avg)}`}>{s.avg}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {flags.length > 0 && (
+        <div className="flags">
+          <h3>⚠ Flagged Items (Score ≤ 2)</h3>
+          {flags.map((f,i) => (
+            <div key={i} className="flag-item">
+              <strong>{f.section}:</strong> {f.label} — {f.score}/5
+              {f.notes && <div className="flag-note">{f.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── TI Requests Summary ── */}
+      {tiItems && tiItems.length > 0 && (
+        <div className="card" style={{marginBottom:12}}>
+          <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+            <Icon name="wrench" size={16} color="#2563eb"/> TI Requests ({tiItems.length})
+          </h3>
+          {tiItems.map((item,idx) => (
+            <div key={item.id} style={{fontSize:13,padding:"6px 0",borderBottom:"1px solid #f3f4f6",display:"flex",gap:6}}>
+              <span style={{fontWeight:600,color:"#6b7280"}}>{idx+1}.</span>
+              <div>
+                <span>{item.text || "—"}</span>
+                {item.est && <span style={{color:"#6b7280",marginLeft:6}}>({item.est})</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Misc Notes ── */}
+      <div className="card" style={{marginBottom:12}}>
+        <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8}}>Notes</h3>
+        <textarea placeholder="Any other observations, follow-ups, or things to remember about this site..." value={miscNotes} onChange={e=>onSetMiscNotes(e.target.value)} style={{minHeight:100}}/>
+      </div>
+
+      {/* ── Submit to Google Drive ── */}
+      {result ? (
+        <div className="success-banner">
+          <p style={{fontSize:16,fontWeight:700,color:"#16a34a",marginBottom:4}}>✓ Submitted to Google Drive</p>
+          <p style={{fontSize:13,color:"#4b5563"}}>Evaluation, photos, and sketch saved.</p>
+          <a href={result.folderUrl} target="_blank" rel="noopener" style={{fontSize:14}}>Open folder in Drive →</a>
+        </div>
+      ) : uploading ? (
+        <div className="submit-progress">
+          <div className="prog-text" style={{fontWeight:600}}>Uploading to Google Drive...</div>
+          <div className="prog-bar"><div className="prog-fill" style={{width:progress.pct+"%"}}/></div>
+          <div className="prog-status">{progress.step} ({progress.pct}%)</div>
+        </div>
+      ) : (
+        <>
+          <button className="btn btn-submit" style={{marginBottom:12}} onClick={handleSubmit} disabled={!scriptUrl}>
+            <Icon name="upload" size={18} color="#fff"/> Submit to Google Drive
+          </button>
+          {!scriptUrl && (
+            <div className="config-card">
+              <h3>Connect to Google Drive</h3>
+              <p>Paste your Google Apps Script deployment URL below. You only need to do this once — it'll be remembered.</p>
+              <input placeholder="https://script.google.com/macros/s/..." onChange={e=>onSetScriptUrl(e.target.value)} style={{fontSize:12}}/>
+            </div>
+          )}
+        </>
+      )}
+      {error && <div className="flags" style={{marginBottom:12}}><p style={{fontSize:13,margin:0}}>❌ {error}</p></div>}
+
+      <button className="btn btn-primary" style={{marginBottom:12}} onClick={()=>window.print()}>
+        <Icon name="file" size={18} color="#fff"/> Print / Save as PDF
+      </button>
+      <button className="btn btn-secondary" style={{marginBottom:12}} onClick={exportJSON}>
+        <Icon name="download" size={18} color="#2563eb"/> Export Data (JSON)
+      </button>
+    </div>
+  );
+}
+
+// ─── Main App ───
+function App() {
+  const [sections, setSections] = useState(JSON.parse(JSON.stringify(DEFAULT_SECTIONS)));
+  const [tab, setTab] = useState("info");
+  const [secIdx, setSecIdx] = useState(0);
+  const [sketch, setSketch] = useState(null);
+  const [showCustom, setShowCustom] = useState(false);
+  const [gutScore, setGutScore] = useState(0);
+  const [gutNotes, setGutNotes] = useState("");
+  const [tiItems, setTiItems] = useState([]);
+  const [miscNotes, setMiscNotes] = useState("");
+  const addTI = () => setTiItems(p=>[...p,{id:Date.now(),text:"",est:""}]);
+  const updateTI = (id,k,v) => setTiItems(p=>p.map(i=>i.id===id?{...i,[k]:v}:i));
+  const removeTI = (id) => setTiItems(p=>p.filter(i=>i.id!==id));
+  const [scriptUrl, setScriptUrl] = useState(() => {
+    try { return window.localStorage?.getItem("jetson_script_url") || ""; } catch(e) { return ""; }
+  });
+  const handleSetScriptUrl = (url) => {
+    setScriptUrl(url);
+    try { window.localStorage?.setItem("jetson_script_url", url); } catch(e) {}
+  };
+  const [site, setSite] = useState({
+    address:"",city:"",state:"",zip:"",propertyName:"",evaluator:"",
+    date:new Date().toISOString().slice(0,10),landlord:"",broker:"",askingRate:"",availableSF:"",yearBuilt:"",zoning:""
+  });
+
+  const upSite = (k,v) => setSite(p=>({...p,[k]:v}));
+  const upCrit = (si,ci,k,v) => setSections(p=>{const n=[...p];n[si]={...n[si],criteria:[...n[si].criteria]};n[si].criteria[ci]={...n[si].criteria[ci],[k]:v};return n;});
+  const upMeas = (si,mi,v) => setSections(p=>{const n=[...p];n[si]={...n[si],measurements:[...n[si].measurements]};n[si].measurements[mi]={...n[si].measurements[mi],value:v};return n;});
+  const addPhoto = (si,ph) => setSections(p=>{const n=[...p];n[si]={...n[si],photos:[...n[si].photos,ph]};return n;});
+  const rmPhoto = (si,id) => setSections(p=>{const n=[...p];n[si]={...n[si],photos:n[si].photos.filter(x=>x.id!==id)};return n;});
+  const done = sections.filter(s=>s.criteria.some(c=>c.score>0)).length;
+
+  const tabs = [{id:"info",label:"Site Info"},{id:"eval",label:"Evaluate"},{id:"sketch",label:"Sketch"},{id:"gut",label:"Gut Feel"},{id:"ti",label:"TI Requests"},{id:"summary",label:"Summary"}];
+
+  return (
+    <div>
+      <div className="header">
+        <div className="header-inner">
+          <h1><Icon name="building" size={22} color="#2563eb"/> Site Evaluator</h1>
+          <div className="flex-center">
+            <span className="badge">{done}/{sections.length}</span>
+            <button className="settings-btn" onClick={()=>setShowCustom(true)}><Icon name="settings" size={20} color="#6b7280"/></button>
+          </div>
+        </div>
+        <div className="tabs">
+          {tabs.map(t=><button key={t.id} className={`tab ${tab===t.id?"active":""}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}
+        </div>
+      </div>
+
+      {/* Site Info */}
+      {tab==="info" && (
+        <div className="container" style={{paddingTop:20,paddingBottom:40}}>
+          <div className="card">
+            <h2>Property</h2>
+            <input placeholder="Property Name" value={site.propertyName} onChange={e=>upSite("propertyName",e.target.value)} style={{marginBottom:8}} />
+            <input placeholder="Street Address" value={site.address} onChange={e=>upSite("address",e.target.value)} style={{marginBottom:8}} />
+            <div className="grid-3">
+              <input placeholder="City" value={site.city} onChange={e=>upSite("city",e.target.value)} />
+              <input placeholder="State" value={site.state} onChange={e=>upSite("state",e.target.value)} />
+              <input placeholder="ZIP" value={site.zip} onChange={e=>upSite("zip",e.target.value)} />
+            </div>
+          </div>
+          <div className="card">
+            <h2>Listing</h2>
+            <div className="grid-2">
+              <input placeholder="Landlord / Owner" value={site.landlord} onChange={e=>upSite("landlord",e.target.value)} />
+              <input placeholder="Broker" value={site.broker} onChange={e=>upSite("broker",e.target.value)} />
+              <input placeholder="Asking Rate ($/SF)" value={site.askingRate} onChange={e=>upSite("askingRate",e.target.value)} />
+              <input placeholder="Available SF" value={site.availableSF} onChange={e=>upSite("availableSF",e.target.value)} />
+              <input placeholder="Year Built" value={site.yearBuilt} onChange={e=>upSite("yearBuilt",e.target.value)} />
+              <input placeholder="Zoning" value={site.zoning} onChange={e=>upSite("zoning",e.target.value)} />
+            </div>
+          </div>
+          <div className="card">
+            <h2>Tour</h2>
+            <div className="grid-2">
+              <input placeholder="Your Name" value={site.evaluator} onChange={e=>upSite("evaluator",e.target.value)} />
+              <input type="date" value={site.date} onChange={e=>upSite("date",e.target.value)} />
+            </div>
+          </div>
+          <button className="btn btn-primary" onClick={()=>setTab("eval")}>Start Evaluation <Icon name="chevRight" size={18} color="#fff"/></button>
+        </div>
+      )}
+
+      {/* Evaluate */}
+      {tab==="eval" && (
+        <div className="container" style={{paddingTop:16,paddingBottom:40}}>
+          <div className="section-pills">
+            {sections.map((s,i) => {
+              const hasSc = s.criteria.some(c=>c.score>0);
+              return <button key={s.id} className={`pill ${i===secIdx?"active":hasSc?"done":""}`} onClick={()=>setSecIdx(i)}>
+                <Icon name={s.icon} size={16}/>{s.name.split(" & ")[0].split(" / ")[0]}
+              </button>;
+            })}
+          </div>
+          {(()=>{
+            const s = sections[secIdx];
+            return <>
+              <h2 style={{fontSize:16,fontWeight:700,margin:"12px 0",display:"flex",alignItems:"center",gap:8}}>
+                <Icon name={s.icon} size={20} color="#2563eb"/>{s.name}
+              </h2>
+              <div className="card" style={{padding:0}}>
+                {s.criteria.map((c,ci)=>(
+                  <div key={c.id} className="criterion">
+                    <div className="criterion-top">
+                      <span className="criterion-label">{c.label}</span>
+                      <StarRating score={c.score} onChange={v=>upCrit(secIdx,ci,"score",v)}/>
+                    </div>
+                    <input placeholder="Notes..." value={c.notes} onChange={e=>upCrit(secIdx,ci,"notes",e.target.value)} style={{background:"#f9fafb",fontSize:13,padding:"8px 10px"}}/>
+                  </div>
+                ))}
+              </div>
+              <div className="card">
+                <h3><Icon name="ruler" size={16}/> Measurements</h3>
+                <div className="grid-2">
+                  {s.measurements.map((m,mi)=>(
+                    <div key={m.id}><div className="measure-label">{m.label}</div>
+                    <input value={m.value} onChange={e=>upMeas(secIdx,mi,e.target.value)}/></div>
+                  ))}
+                </div>
+              </div>
+              <div className="card">
+                <h3><Icon name="camera" size={16}/> Photos</h3>
+                <PhotoCapture photos={s.photos} sectionName={s.name} onAdd={ph=>addPhoto(secIdx,ph)} onRemove={id=>rmPhoto(secIdx,id)}/>
+              </div>
+              <div className="nav-row">
+                {secIdx>0 && <button className="btn btn-secondary btn-nav" onClick={()=>setSecIdx(i=>i-1)}><Icon name="chevLeft" size={16} color="#2563eb"/> Prev</button>}
+                {secIdx<sections.length-1
+                  ? <button className="btn btn-primary btn-nav" onClick={()=>setSecIdx(i=>i+1)}>Next <Icon name="chevRight" size={16} color="#fff"/></button>
+                  : <button className="btn btn-primary btn-nav" onClick={()=>setTab("sketch")}>Sketch <Icon name="chevRight" size={16} color="#fff"/></button>}
+              </div>
+            </>;
+          })()}
+        </div>
+      )}
+
+      {/* Sketch */}
+      {tab==="sketch" && (
+        <div className="container" style={{paddingTop:20,paddingBottom:40}}>
+          <h2 style={{fontSize:16,fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+            <Icon name="pencil" size={20} color="#2563eb"/> Floor Plan Sketch
+          </h2>
+          <SketchCanvas sketchData={sketch} onSave={setSketch}/>
+          <div style={{marginTop:16}}>
+            <button className="btn btn-primary" onClick={()=>setTab("gut")}>Gut Feel <Icon name="chevRight" size={18} color="#fff"/></button>
+          </div>
+        </div>
+      )}
+
+      {/* Gut Feel */}
+      {tab==="gut" && (
+        <div className="container" style={{paddingTop:20,paddingBottom:40}}>
+          <div className="card">
+            <div className="gut-feel-area">
+              <Icon name="heart" size={32} color="#2563eb"/>
+              <h2 style={{fontSize:18,fontWeight:700,marginTop:8,marginBottom:4}}>Overall Gut Feel</h2>
+              <p style={{fontSize:13,color:"#6b7280",marginBottom:12}}>Forget the numbers — how does this site feel?</p>
+              <StarRating score={gutScore} onChange={setGutScore} large={true} />
+              {gutScore > 0 && <div className="gut-feel-label">{GUT_LABELS[gutScore]}</div>}
+            </div>
+            <textarea placeholder="What stood out? Any dealbreakers? Would you bring the team back for a second look?" value={gutNotes} onChange={e=>setGutNotes(e.target.value)} style={{minHeight:120,marginTop:12}}/>
+          </div>
+          <button className="btn btn-primary" onClick={()=>setTab("ti")}>TI Requests <Icon name="chevRight" size={18} color="#fff"/></button>
+        </div>
+      )}
+
+      {/* TI Requests */}
+      {tab==="ti" && (
+        <div className="container" style={{paddingTop:20,paddingBottom:40}}>
+          <h2 style={{fontSize:16,fontWeight:700,marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
+            <Icon name="wrench" size={20} color="#2563eb"/> Tenant Improvement Requests
+          </h2>
+          <p style={{fontSize:13,color:"#6b7280",marginBottom:16}}>What would you need the landlord to do before move-in?</p>
+
+          {tiItems.length === 0 && (
+            <div className="card" style={{textAlign:"center",padding:24,color:"#9ca3af"}}>
+              <p style={{fontSize:14}}>No TI requests yet.</p>
+              <p style={{fontSize:12,marginTop:4}}>Tap "Add Item" below to start your list.</p>
+            </div>
+          )}
+
+          {tiItems.map((item,idx) => (
+            <div key={item.id} className="card" style={{padding:12,marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                <span style={{fontSize:13,fontWeight:700,color:"#6b7280",paddingTop:10,minWidth:20}}>{idx+1}.</span>
+                <div style={{flex:1}}>
+                  <input placeholder="Describe the improvement needed..." value={item.text} onChange={e=>updateTI(item.id,"text",e.target.value)} style={{marginBottom:6}}/>
+                  <input placeholder="Estimated cost (optional)" value={item.est} onChange={e=>updateTI(item.id,"est",e.target.value)} style={{fontSize:12,padding:"8px 10px",background:"#f9fafb"}}/>
+                </div>
+                <button onClick={()=>removeTI(item.id)} style={{background:"none",border:"none",padding:8,color:"#ef4444",flexShrink:0}}>
+                  <Icon name="trash" size={16} color="#ef4444"/>
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button onClick={addTI} className="btn btn-secondary" style={{marginTop:8,marginBottom:16}}>
+            <Icon name="plus" size={16} color="#2563eb"/> Add Item
+          </button>
+
+          <button className="btn btn-primary" onClick={()=>setTab("summary")}>View Summary <Icon name="chevRight" size={18} color="#fff"/></button>
+        </div>
+      )}
+
+      {/* Summary */}
+      {tab==="summary" && <SummaryView siteInfo={site} sections={sections} sketchData={sketch} gutScore={gutScore} gutNotes={gutNotes} tiItems={tiItems} miscNotes={miscNotes} onSetMiscNotes={setMiscNotes} scriptUrl={scriptUrl} onSetScriptUrl={handleSetScriptUrl}/>}
+
+      {showCustom && <CustomizeModal sections={sections} onSave={s=>{setSections(s);setShowCustom(false);}} onClose={()=>setShowCustom(false)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
