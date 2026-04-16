@@ -121,13 +121,35 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .gut-feel-stars{display:flex;justify-content:center;gap:8px;margin:16px 0}
 .gut-feel-stars .star-btn svg{width:40px;height:40px}
 .gut-feel-label{font-size:24px;font-weight:700;color:#1f2937;margin-top:8px}
+.save-indicator{font-size:11px;display:flex;align-items:center;gap:4px;font-weight:500}
+.save-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.save-dot.green{background:#16a34a}
+.save-dot.orange{background:#f59e0b}
+.save-dot.pulse{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:12px;color:#6b7280}
+.loading-spinner{width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.draft-list{padding:0;list-style:none}
+.draft-item{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.draft-item-info{flex:1;min-width:0}
+.draft-item-name{font-size:14px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.draft-item-meta{font-size:11px;color:#6b7280;margin-top:2px}
+.draft-item-actions{display:flex;gap:6px;flex-shrink:0}
+.draft-item-actions button{padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;border:none}
+.btn-resume{background:#2563eb;color:#fff}
+.btn-resume:active{background:#1d4ed8}
+.btn-delete-draft{background:#fef2f2;color:#dc2626}
+.btn-delete-draft:active{background:#fee2e2}
+.compress-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6b7280;margin-left:8px}
+.storage-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:8px}
 @media print{.sticky,button,input[type="file"],.header,.section-pills,.nav-row{display:none!important}body{font-size:12px}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useRef, useEffect } = React;
+const { useState, useRef, useEffect, useCallback } = React;
 
 // ─── SVG Icons ───
 const Icon = ({ name, size = 20, color = "currentColor" }) => {
@@ -155,9 +177,198 @@ const Icon = ({ name, size = 20, color = "currentColor" }) => {
     upload: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
     wrench: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
     file: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+    list: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
   };
   return icons[name] || null;
 };
+
+// ─── IndexedDB Storage Layer ───
+const EvalStorage = {
+  db: null,
+  DB_NAME: "warehouseEvals",
+  DB_VERSION: 1,
+
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains("drafts")) {
+          db.createObjectStore("drafts", { keyPath: "draftId" });
+        }
+        if (!db.objectStoreNames.contains("blobs")) {
+          const store = db.createObjectStore("blobs", { keyPath: ["draftId", "blobType", "blobId"] });
+          store.createIndex("byDraft", "draftId", { unique: false });
+        }
+      };
+      req.onsuccess = (e) => { this.db = e.target.result; resolve(this.db); };
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async saveDraftMeta(draftId, state) {
+    const db = await this.open();
+    const sectionsClean = state.sections.map(s => ({
+      ...s,
+      photos: s.photos.map(p => ({ id: p.id, label: p.label, timestamp: p.timestamp }))
+    }));
+    const record = {
+      draftId,
+      site: state.site,
+      sections: sectionsClean,
+      gutScore: state.gutScore,
+      gutNotes: state.gutNotes,
+      tiItems: state.tiItems,
+      miscNotes: state.miscNotes,
+      updatedAt: Date.now(),
+      createdAt: state.createdAt || Date.now()
+    };
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("drafts", "readwrite");
+      tx.objectStore("drafts").put(record);
+      tx.oncomplete = () => {
+        this._updateIndex(draftId, state.site, sectionsClean);
+        resolve();
+      };
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  _updateIndex(draftId, site, sections) {
+    try {
+      const idx = JSON.parse(localStorage.getItem("jetson_draft_index") || "[]");
+      const photoCount = sections.reduce((a, s) => a + s.photos.length, 0);
+      const existing = idx.findIndex(d => d.draftId === draftId);
+      const entry = {
+        draftId,
+        propertyName: site.propertyName || "",
+        address: site.address || "",
+        city: site.city || "",
+        date: site.date || "",
+        evaluator: site.evaluator || "",
+        photoCount,
+        updatedAt: Date.now()
+      };
+      if (existing >= 0) idx[existing] = entry; else idx.push(entry);
+      localStorage.setItem("jetson_draft_index", JSON.stringify(idx));
+    } catch (e) {}
+  },
+
+  async saveBlob(draftId, blobType, blobId, sectionId, dataUrl, label) {
+    const db = await this.open();
+    const record = { draftId, blobType, blobId: String(blobId), sectionId, data: dataUrl, label, timestamp: Date.now() };
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("blobs", "readwrite");
+      tx.objectStore("blobs").put(record);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async deleteBlob(draftId, blobType, blobId) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("blobs", "readwrite");
+      tx.objectStore("blobs").delete([draftId, blobType, String(blobId)]);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async loadDraft(draftId) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(["drafts", "blobs"], "readonly");
+      let meta = null;
+      const blobs = [];
+
+      const metaReq = tx.objectStore("drafts").get(draftId);
+      metaReq.onsuccess = () => { meta = metaReq.result; };
+
+      const blobIdx = tx.objectStore("blobs").index("byDraft");
+      const blobReq = blobIdx.openCursor(IDBKeyRange.only(draftId));
+      blobReq.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) { blobs.push(cursor.value); cursor.continue(); }
+      };
+
+      tx.oncomplete = () => {
+        if (!meta) { resolve(null); return; }
+        const photoMap = {};
+        let sketchData = null;
+        for (const b of blobs) {
+          if (b.blobType === "sketch") { sketchData = b.data; }
+          else if (b.blobType === "photo") {
+            if (!photoMap[b.sectionId]) photoMap[b.sectionId] = [];
+            photoMap[b.sectionId].push({ id: Number(b.blobId), data: b.data, label: b.label, timestamp: b.timestamp });
+          }
+        }
+        const sections = meta.sections.map(s => ({
+          ...s,
+          photos: (photoMap[s.id] || []).sort((a, b) => a.id - b.id)
+        }));
+        resolve({ ...meta, sections, sketch: sketchData });
+      };
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  listDrafts() {
+    try {
+      return JSON.parse(localStorage.getItem("jetson_draft_index") || "[]")
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    } catch (e) { return []; }
+  },
+
+  async deleteDraft(draftId) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(["drafts", "blobs"], "readwrite");
+      tx.objectStore("drafts").delete(draftId);
+      const blobIdx = tx.objectStore("blobs").index("byDraft");
+      const req = blobIdx.openCursor(IDBKeyRange.only(draftId));
+      req.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) { cursor.delete(); cursor.continue(); }
+      };
+      tx.oncomplete = () => {
+        try {
+          const idx = JSON.parse(localStorage.getItem("jetson_draft_index") || "[]");
+          localStorage.setItem("jetson_draft_index", JSON.stringify(idx.filter(d => d.draftId !== draftId)));
+        } catch (e) {}
+        if (localStorage.getItem("jetson_active_draft") === draftId) {
+          localStorage.removeItem("jetson_active_draft");
+        }
+        resolve();
+      };
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  }
+};
+
+// ─── Photo Compression ───
+function compressPhoto(dataUrl, maxDim = 1600, quality = 0.7) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 
 // ─── Simplified Sections ───
 const DEFAULT_SECTIONS = [
@@ -217,6 +428,11 @@ const DEFAULT_SECTIONS = [
     photos:[] },
 ];
 
+const DEFAULT_SITE = {
+  address:"",city:"",state:"",zip:"",propertyName:"",evaluator:"",
+  date:new Date().toISOString().slice(0,10),landlord:"",broker:"",askingRate:"",availableSF:"",yearBuilt:"",zoning:""
+};
+
 // ─── Star Rating ───
 function StarRating({ score, onChange, large }) {
   return (
@@ -233,14 +449,18 @@ function StarRating({ score, onChange, large }) {
 const GUT_LABELS = ["","Pass","Below Average","Average","Strong Contender","Top Pick"];
 
 // ─── Photo Capture ───
-function PhotoCapture({ photos, onAdd, onRemove, sectionName }) {
+function PhotoCapture({ photos, onAdd, onRemove, sectionName, storageQuota }) {
   const fileRef = useRef(null);
-  const handleCapture = (e) => {
+  const [compressing, setCompressing] = useState(false);
+  const handleCapture = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setCompressing(true);
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      onAdd({ id: Date.now(), data: ev.target.result, label: sectionName + " #" + (photos.length + 1), timestamp: new Date().toLocaleString() });
+    reader.onload = async (ev) => {
+      const compressed = await compressPhoto(ev.target.result);
+      onAdd({ id: Date.now(), data: compressed, label: sectionName + " #" + (photos.length + 1), timestamp: new Date().toLocaleString() });
+      setCompressing(false);
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -248,16 +468,22 @@ function PhotoCapture({ photos, onAdd, onRemove, sectionName }) {
   return (
     <div>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
-      <button className="btn-photo" onClick={() => fileRef.current?.click()}>
-        <Icon name="camera" size={16} color="#fff" /> Take Photo
-      </button>
+      {storageQuota && storageQuota.pctUsed > 80 && (
+        <div className="storage-warn">Storage {storageQuota.pctUsed}% full. Consider submitting to Drive before taking more photos.</div>
+      )}
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <button className="btn-photo" onClick={() => fileRef.current?.click()} disabled={compressing}>
+          <Icon name="camera" size={16} color="#fff" /> {compressing ? "Compressing..." : "Take Photo"}
+        </button>
+        {compressing && <span className="compress-badge"><span className="save-dot orange pulse"/>Optimizing...</span>}
+      </div>
       {photos.length > 0 && (
         <div className="photos-grid">
           {photos.map(p => (
             <div key={p.id} className="photo-thumb">
               <img src={p.data} alt={p.label} />
               <div className="photo-label">{p.label}</div>
-              <button className="photo-remove" onClick={() => onRemove(p.id)}>×</button>
+              <button className="photo-remove" onClick={() => onRemove(p.id)}>x</button>
             </div>
           ))}
         </div>
@@ -303,7 +529,7 @@ function SketchCanvas({ sketchData, onSave }) {
     ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
     lastPos.current = pos;
   };
-  const endDraw = () => { if (isDrawing) { setIsDrawing(false); onSave(canvasRef.current.toDataURL()); } };
+  const endDraw = () => { if (isDrawing) { setIsDrawing(false); onSave(canvasRef.current.toDataURL("image/jpeg", 0.8)); } };
   const clearCanvas = () => {
     const c = canvasRef.current; const ctx = c.getContext("2d");
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
@@ -316,13 +542,13 @@ function SketchCanvas({ sketchData, onSave }) {
   return (
     <div>
       <div className="canvas-tools">
-        <button className={`tool-btn ${tool==="pen"?"active":""}`} onClick={()=>setTool("pen")}>✏️ Pen</button>
+        <button className={`tool-btn ${tool==="pen"?"active":""}`} onClick={()=>setTool("pen")}>Pen</button>
         <button className={`tool-btn ${tool==="eraser"?"active":""}`} onClick={()=>setTool("eraser")}>Eraser</button>
         <select value={lineWidth} onChange={e=>setLineWidth(Number(e.target.value))} style={{width:"auto",padding:"6px 8px",fontSize:"13px"}}>
           <option value={2}>Thin</option><option value={3}>Medium</option><option value={5}>Thick</option>
         </select>
         <input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{width:32,height:32,padding:0,border:"none",borderRadius:6,cursor:"pointer"}} />
-        <button className="tool-btn danger" onClick={clearCanvas} style={{marginLeft:"auto"}}>↺ Clear</button>
+        <button className="tool-btn danger" onClick={clearCanvas} style={{marginLeft:"auto"}}>Clear</button>
       </div>
       <div className="canvas-wrap">
         <canvas ref={canvasRef} style={{height:300}}
@@ -342,7 +568,7 @@ function CustomizeModal({ sections, onSave, onClose }) {
   return (
     <div className="modal-overlay" onClick={(e)=>{if(e.target===e.currentTarget)onClose()}}>
       <div className="modal">
-        <div className="modal-header"><h2>Customize Checklist</h2><button className="modal-close" onClick={onClose}>×</button></div>
+        <div className="modal-header"><h2>Customize Checklist</h2><button className="modal-close" onClick={onClose}>x</button></div>
         {ed.map((s,si) => (
           <div key={s.id} className="modal-section">
             <h3>{s.name}</h3>
@@ -364,44 +590,90 @@ function CustomizeModal({ sections, onSave, onClose }) {
   );
 }
 
-// ─── Drive Upload Logic (Form-based, fully CORS-safe) ───
-// Uses hidden form + iframe to POST to Google Apps Script
-// This bypasses CORS entirely since HTML form submissions are exempt from same-origin policy
+// ─── Draft Picker ───
+function DraftPicker({ onResume, onNew, onDelete }) {
+  const [drafts, setDrafts] = useState(EvalStorage.listDrafts());
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
+  const handleDelete = async (draftId) => {
+    await onDelete(draftId);
+    setDrafts(EvalStorage.listDrafts());
+    setConfirmDelete(null);
+  };
+
+  return (
+    <div className="container" style={{paddingTop:24,paddingBottom:40}}>
+      <div style={{textAlign:"center",marginBottom:24}}>
+        <Icon name="building" size={40} color="#2563eb"/>
+        <h2 style={{fontSize:20,fontWeight:700,marginTop:8}}>Site Evaluator</h2>
+        <p style={{fontSize:13,color:"#6b7280",marginTop:4}}>Your evaluations are saved locally on this device.</p>
+      </div>
+
+      {drafts.length > 0 && (
+        <div style={{marginBottom:20}}>
+          <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8}}>Saved Evaluations ({drafts.length})</h3>
+          <div className="draft-list">
+            {drafts.map(d => (
+              <div key={d.draftId} className="draft-item">
+                <div className="draft-item-info">
+                  <div className="draft-item-name">{d.propertyName || d.address || "Untitled Evaluation"}</div>
+                  <div className="draft-item-meta">
+                    {[d.city, d.date, d.evaluator].filter(Boolean).join(" · ")}
+                    {d.photoCount > 0 && ` · ${d.photoCount} photos`}
+                  </div>
+                  <div className="draft-item-meta">Last saved: {new Date(d.updatedAt).toLocaleString()}</div>
+                </div>
+                <div className="draft-item-actions">
+                  {confirmDelete === d.draftId ? (
+                    <>
+                      <button className="btn-delete-draft" onClick={() => handleDelete(d.draftId)}>Confirm</button>
+                      <button style={{padding:"8px 12px",borderRadius:8,fontSize:12,fontWeight:600,border:"1px solid #d1d5db",background:"#fff",color:"#374151"}} onClick={() => setConfirmDelete(null)}>Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="btn-resume" onClick={() => onResume(d.draftId)}>Resume</button>
+                      <button className="btn-delete-draft" onClick={() => setConfirmDelete(d.draftId)}><Icon name="trash" size={14} color="#dc2626"/></button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button className="btn btn-primary" onClick={onNew}>
+        <Icon name="plus" size={18} color="#fff"/> New Evaluation
+      </button>
+    </div>
+  );
+}
+
+// ─── Drive Upload Logic (Form-based, fully CORS-safe) ───
 function postViaForm(scriptUrl, payload, waitMs) {
   return new Promise((resolve, reject) => {
     try {
       const id = "gas_" + Date.now() + "_" + Math.random().toString(36).slice(2);
-
-      // Create hidden iframe to receive the response
       const iframe = document.createElement("iframe");
       iframe.name = id;
       iframe.style.display = "none";
       document.body.appendChild(iframe);
-
-      // Create form targeting the iframe
       const form = document.createElement("form");
       form.method = "POST";
       form.action = scriptUrl;
       form.target = id;
       form.style.display = "none";
-
-      // Put JSON payload in a hidden input
       const input = document.createElement("input");
       input.type = "hidden";
       input.name = "payload";
       input.value = JSON.stringify(payload);
       form.appendChild(input);
-
       document.body.appendChild(form);
       form.submit();
-
-      // Clean up and resolve after wait time
       setTimeout(() => {
         try { form.remove(); iframe.remove(); } catch(e) {}
         resolve({ success: true });
       }, waitMs || 3000);
-
     } catch (err) {
       reject(err);
     }
@@ -413,7 +685,6 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
   const totalSteps = totalPhotos + (sketchData ? 1 : 0) + 1;
   let completed = 0;
 
-  // Step 1: Submit evaluation data (creates folder + summary)
   completed++;
   onProgress({ step: "Creating folder & saving summary...", pct: Math.round((completed / totalSteps) * 100) });
 
@@ -434,14 +705,12 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
     hasSketch: !!sketchData
   }, 5000);
 
-  // Step 2: Upload photos one at a time (uses site info to find folder)
   const siteKey = { state: siteInfo.state, city: siteInfo.city, propertyName: siteInfo.propertyName, address: siteInfo.address, date: siteInfo.date };
 
   for (const sec of sections) {
     for (const photo of sec.photos) {
       completed++;
       onProgress({ step: `Uploading ${photo.label}...`, pct: Math.round((completed / totalSteps) * 100) });
-
       await postViaForm(scriptUrl, {
         action: "upload_photo",
         siteKey,
@@ -451,11 +720,9 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
     }
   }
 
-  // Step 3: Upload sketch
   if (sketchData) {
     completed++;
     onProgress({ step: "Uploading floor plan sketch...", pct: Math.round((completed / totalSteps) * 100) });
-
     await postViaForm(scriptUrl, {
       action: "upload_photo",
       siteKey,
@@ -469,7 +736,7 @@ async function submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore
 }
 
 // ─── Summary View ───
-function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiItems, miscNotes, onSetMiscNotes, scriptUrl, onSetScriptUrl }) {
+function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiItems, miscNotes, onSetMiscNotes, scriptUrl, onSetScriptUrl, onSubmitted }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ step: "", pct: 0 });
   const [result, setResult] = useState(null);
@@ -481,7 +748,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
     return { name:s.name, avg:avg.toFixed(1), scored:scored.length, total:s.criteria.length };
   });
   const allScored = sections.flatMap(s=>s.criteria).filter(c=>c.score>0);
-  const overall = allScored.length ? (allScored.reduce((a,c)=>a+c.score,0)/allScored.length).toFixed(1) : "—";
+  const overall = allScored.length ? (allScored.reduce((a,c)=>a+c.score,0)/allScored.length).toFixed(1) : "\u2014";
   const totalPhotos = sections.reduce((a,s)=>a+s.photos.length,0);
   const scoreClr = (v) => { const n=parseFloat(v); if(n>=4) return "score-green"; if(n>=3) return "score-yellow"; if(n>=1) return "score-red"; return "score-gray"; };
 
@@ -503,6 +770,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
     try {
       const res = await submitToDrive(scriptUrl, siteInfo, sections, sketchData, gutScore, gutNotes, overall, tiItems, miscNotes, setProgress);
       setResult(res);
+      if (onSubmitted) onSubmitted();
     } catch (err) {
       setError(err.message || "Upload failed. Check your connection and try again.");
     }
@@ -541,7 +809,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
       </div>
       {flags.length > 0 && (
         <div className="flags">
-          <h3>⚠ Flagged Items (Score ≤ 2)</h3>
+          <h3>Flagged Items (Score 2 or below)</h3>
           {flags.map((f,i) => (
             <div key={i} className="flag-item">
               <strong>{f.section}:</strong> {f.label} — {f.score}/5
@@ -551,7 +819,6 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
         </div>
       )}
 
-      {/* ── TI Requests Summary ── */}
       {tiItems && tiItems.length > 0 && (
         <div className="card" style={{marginBottom:12}}>
           <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
@@ -561,7 +828,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
             <div key={item.id} style={{fontSize:13,padding:"6px 0",borderBottom:"1px solid #f3f4f6",display:"flex",gap:6}}>
               <span style={{fontWeight:600,color:"#6b7280"}}>{idx+1}.</span>
               <div>
-                <span>{item.text || "—"}</span>
+                <span>{item.text || "\u2014"}</span>
                 {item.est && <span style={{color:"#6b7280",marginLeft:6}}>({item.est})</span>}
               </div>
             </div>
@@ -569,18 +836,16 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
         </div>
       )}
 
-      {/* ── Misc Notes ── */}
       <div className="card" style={{marginBottom:12}}>
         <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8}}>Notes</h3>
         <textarea placeholder="Any other observations, follow-ups, or things to remember about this site..." value={miscNotes} onChange={e=>onSetMiscNotes(e.target.value)} style={{minHeight:100}}/>
       </div>
 
-      {/* ── Submit to Google Drive ── */}
       {result ? (
         <div className="success-banner">
-          <p style={{fontSize:16,fontWeight:700,color:"#16a34a",marginBottom:4}}>✓ Submitted to Google Drive</p>
+          <p style={{fontSize:16,fontWeight:700,color:"#16a34a",marginBottom:4}}>Submitted to Google Drive</p>
           <p style={{fontSize:13,color:"#4b5563"}}>Evaluation, photos, and sketch saved.</p>
-          <a href={result.folderUrl} target="_blank" rel="noopener" style={{fontSize:14}}>Open folder in Drive →</a>
+          <a href={result.folderUrl} target="_blank" rel="noopener" style={{fontSize:14}}>Open folder in Drive</a>
         </div>
       ) : uploading ? (
         <div className="submit-progress">
@@ -602,7 +867,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
           )}
         </>
       )}
-      {error && <div className="flags" style={{marginBottom:12}}><p style={{fontSize:13,margin:0}}>❌ {error}</p></div>}
+      {error && <div className="flags" style={{marginBottom:12}}><p style={{fontSize:13,margin:0}}>{error}</p></div>}
 
       <button className="btn btn-primary" style={{marginBottom:12}} onClick={()=>window.print()}>
         <Icon name="file" size={18} color="#fff"/> Print / Save as PDF
@@ -616,6 +881,14 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
 
 // ─── Main App ───
 function App() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [draftId, setDraftId] = useState(null);
+  const [showDraftPicker, setShowDraftPicker] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("saved");
+  const [storageQuota, setStorageQuota] = useState(null);
+  const saveTimer = useRef(null);
+  const createdAt = useRef(Date.now());
+
   const [sections, setSections] = useState(JSON.parse(JSON.stringify(DEFAULT_SECTIONS)));
   const [tab, setTab] = useState("info");
   const [secIdx, setSecIdx] = useState(0);
@@ -635,17 +908,190 @@ function App() {
     setScriptUrl(url);
     try { window.localStorage?.setItem("jetson_script_url", url); } catch(e) {}
   };
-  const [site, setSite] = useState({
-    address:"",city:"",state:"",zip:"",propertyName:"",evaluator:"",
-    date:new Date().toISOString().slice(0,10),landlord:"",broker:"",askingRate:"",availableSF:"",yearBuilt:"",zoning:""
-  });
+  const [site, setSite] = useState({...DEFAULT_SITE});
 
   const upSite = (k,v) => setSite(p=>({...p,[k]:v}));
   const upCrit = (si,ci,k,v) => setSections(p=>{const n=[...p];n[si]={...n[si],criteria:[...n[si].criteria]};n[si].criteria[ci]={...n[si].criteria[ci],[k]:v};return n;});
   const upMeas = (si,mi,v) => setSections(p=>{const n=[...p];n[si]={...n[si],measurements:[...n[si].measurements]};n[si].measurements[mi]={...n[si].measurements[mi],value:v};return n;});
-  const addPhoto = (si,ph) => setSections(p=>{const n=[...p];n[si]={...n[si],photos:[...n[si].photos,ph]};return n;});
-  const rmPhoto = (si,id) => setSections(p=>{const n=[...p];n[si]={...n[si],photos:n[si].photos.filter(x=>x.id!==id)};return n;});
+
+  // ─── Photo add/remove with immediate blob persistence ───
+  const addPhoto = useCallback((si, ph) => {
+    setSections(p => {
+      const n = [...p];
+      n[si] = { ...n[si], photos: [...n[si].photos, ph] };
+      return n;
+    });
+    if (draftId) {
+      const secId = sections[si]?.id || String(si);
+      EvalStorage.saveBlob(draftId, "photo", String(ph.id), secId, ph.data, ph.label).catch(() => {});
+    }
+  }, [draftId, sections]);
+
+  const rmPhoto = useCallback((si, id) => {
+    setSections(p => {
+      const n = [...p];
+      n[si] = { ...n[si], photos: n[si].photos.filter(x => x.id !== id) };
+      return n;
+    });
+    if (draftId) {
+      EvalStorage.deleteBlob(draftId, "photo", String(id)).catch(() => {});
+    }
+  }, [draftId]);
+
+  // ─── Sketch save with immediate blob persistence ───
+  const handleSketchSave = useCallback((data) => {
+    setSketch(data);
+    if (draftId) {
+      if (data) {
+        EvalStorage.saveBlob(draftId, "sketch", "main", null, data, "Floor Plan Sketch").catch(() => {});
+      } else {
+        EvalStorage.deleteBlob(draftId, "sketch", "main").catch(() => {});
+      }
+    }
+  }, [draftId]);
+
   const done = sections.filter(s=>s.criteria.some(c=>c.score>0)).length;
+
+  // ─── Debounced auto-save for metadata ───
+  useEffect(() => {
+    if (!draftId || isLoading) return;
+    setSaveStatus("unsaved");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      setSaveStatus("saving");
+      EvalStorage.saveDraftMeta(draftId, {
+        site, sections, gutScore, gutNotes, tiItems, miscNotes, createdAt: createdAt.current
+      }).then(() => {
+        setSaveStatus("saved");
+      }).catch(() => {
+        setSaveStatus("unsaved");
+      });
+    }, 1000);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [site, sections, gutScore, gutNotes, tiItems, miscNotes, draftId, isLoading]);
+
+  // ─── beforeunload warning ───
+  useEffect(() => {
+    const handler = (e) => {
+      if (saveStatus !== "saved") { e.preventDefault(); e.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [saveStatus]);
+
+  // ─── Init: open DB, check for active draft ───
+  useEffect(() => {
+    (async () => {
+      try {
+        await EvalStorage.open();
+        const activeDraftId = localStorage.getItem("jetson_active_draft");
+        if (activeDraftId) {
+          const data = await EvalStorage.loadDraft(activeDraftId);
+          if (data) {
+            setSite(data.site);
+            setSections(data.sections);
+            setGutScore(data.gutScore || 0);
+            setGutNotes(data.gutNotes || "");
+            setTiItems(data.tiItems || []);
+            setMiscNotes(data.miscNotes || "");
+            setSketch(data.sketch || null);
+            createdAt.current = data.createdAt || Date.now();
+            setDraftId(activeDraftId);
+            setIsLoading(false);
+            return;
+          }
+        }
+        const drafts = EvalStorage.listDrafts();
+        if (drafts.length > 0) {
+          setShowDraftPicker(true);
+        } else {
+          const newId = "draft_" + Date.now();
+          setDraftId(newId);
+          localStorage.setItem("jetson_active_draft", newId);
+        }
+      } catch (e) {
+        const newId = "draft_" + Date.now();
+        setDraftId(newId);
+        localStorage.setItem("jetson_active_draft", newId);
+      }
+      setIsLoading(false);
+    })();
+  }, []);
+
+  // ─── Check storage quota ───
+  useEffect(() => {
+    if (navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then(est => {
+        if (est.quota) {
+          setStorageQuota({ pctUsed: Math.round((est.usage / est.quota) * 100) });
+        }
+      }).catch(() => {});
+    }
+  }, [sections]);
+
+  // ─── Draft picker handlers ───
+  const handleResumeDraft = async (id) => {
+    setIsLoading(true);
+    setShowDraftPicker(false);
+    try {
+      const data = await EvalStorage.loadDraft(id);
+      if (data) {
+        setSite(data.site);
+        setSections(data.sections);
+        setGutScore(data.gutScore || 0);
+        setGutNotes(data.gutNotes || "");
+        setTiItems(data.tiItems || []);
+        setMiscNotes(data.miscNotes || "");
+        setSketch(data.sketch || null);
+        createdAt.current = data.createdAt || Date.now();
+        setDraftId(id);
+        localStorage.setItem("jetson_active_draft", id);
+        setTab("info");
+      }
+    } catch (e) {}
+    setIsLoading(false);
+  };
+
+  const handleNewDraft = () => {
+    const newId = "draft_" + Date.now();
+    setSite({...DEFAULT_SITE});
+    setSections(JSON.parse(JSON.stringify(DEFAULT_SECTIONS)));
+    setGutScore(0);
+    setGutNotes("");
+    setTiItems([]);
+    setMiscNotes("");
+    setSketch(null);
+    createdAt.current = Date.now();
+    setDraftId(newId);
+    localStorage.setItem("jetson_active_draft", newId);
+    setShowDraftPicker(false);
+    setTab("info");
+  };
+
+  const handleDeleteDraft = async (id) => {
+    await EvalStorage.deleteDraft(id);
+  };
+
+  const handleSubmitted = async () => {
+    if (draftId) {
+      await EvalStorage.deleteDraft(draftId);
+    }
+  };
+
+  // ─── Loading screen ───
+  if (isLoading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner"/>
+        <p style={{fontSize:14}}>Loading evaluation...</p>
+      </div>
+    );
+  }
+
+  // ─── Draft picker ───
+  if (showDraftPicker || !draftId) {
+    return <DraftPicker onResume={handleResumeDraft} onNew={handleNewDraft} onDelete={handleDeleteDraft}/>;
+  }
 
   const tabs = [{id:"info",label:"Site Info"},{id:"eval",label:"Evaluate"},{id:"sketch",label:"Sketch"},{id:"gut",label:"Gut Feel"},{id:"ti",label:"TI Requests"},{id:"summary",label:"Summary"}];
 
@@ -655,7 +1101,14 @@ function App() {
         <div className="header-inner">
           <h1><Icon name="building" size={22} color="#2563eb"/> Site Evaluator</h1>
           <div className="flex-center">
+            <div className="save-indicator">
+              <span className={`save-dot ${saveStatus==="saved"?"green":saveStatus==="saving"?"orange pulse":"orange"}`}/>
+              <span style={{color:saveStatus==="saved"?"#16a34a":"#f59e0b"}}>
+                {saveStatus==="saved"?"Saved":saveStatus==="saving"?"Saving...":"Unsaved"}
+              </span>
+            </div>
             <span className="badge">{done}/{sections.length}</span>
+            <button className="settings-btn" onClick={()=>setShowDraftPicker(true)} title="My Evaluations"><Icon name="list" size={20} color="#6b7280"/></button>
             <button className="settings-btn" onClick={()=>setShowCustom(true)}><Icon name="settings" size={20} color="#6b7280"/></button>
           </div>
         </div>
@@ -738,7 +1191,7 @@ function App() {
               </div>
               <div className="card">
                 <h3><Icon name="camera" size={16}/> Photos</h3>
-                <PhotoCapture photos={s.photos} sectionName={s.name} onAdd={ph=>addPhoto(secIdx,ph)} onRemove={id=>rmPhoto(secIdx,id)}/>
+                <PhotoCapture photos={s.photos} sectionName={s.name} onAdd={ph=>addPhoto(secIdx,ph)} onRemove={id=>rmPhoto(secIdx,id)} storageQuota={storageQuota}/>
               </div>
               <div className="nav-row">
                 {secIdx>0 && <button className="btn btn-secondary btn-nav" onClick={()=>setSecIdx(i=>i-1)}><Icon name="chevLeft" size={16} color="#2563eb"/> Prev</button>}
@@ -757,7 +1210,7 @@ function App() {
           <h2 style={{fontSize:16,fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
             <Icon name="pencil" size={20} color="#2563eb"/> Floor Plan Sketch
           </h2>
-          <SketchCanvas sketchData={sketch} onSave={setSketch}/>
+          <SketchCanvas sketchData={sketch} onSave={handleSketchSave}/>
           <div style={{marginTop:16}}>
             <button className="btn btn-primary" onClick={()=>setTab("gut")}>Gut Feel <Icon name="chevRight" size={18} color="#fff"/></button>
           </div>
@@ -820,7 +1273,7 @@ function App() {
       )}
 
       {/* Summary */}
-      {tab==="summary" && <SummaryView siteInfo={site} sections={sections} sketchData={sketch} gutScore={gutScore} gutNotes={gutNotes} tiItems={tiItems} miscNotes={miscNotes} onSetMiscNotes={setMiscNotes} scriptUrl={scriptUrl} onSetScriptUrl={handleSetScriptUrl}/>}
+      {tab==="summary" && <SummaryView siteInfo={site} sections={sections} sketchData={sketch} gutScore={gutScore} gutNotes={gutNotes} tiItems={tiItems} miscNotes={miscNotes} onSetMiscNotes={setMiscNotes} scriptUrl={scriptUrl} onSetScriptUrl={handleSetScriptUrl} onSubmitted={handleSubmitted}/>}
 
       {showCustom && <CustomizeModal sections={sections} onSave={s=>{setSections(s);setShowCustom(false);}} onClose={()=>setShowCustom(false)}/>}
     </div>
