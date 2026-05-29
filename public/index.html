@@ -849,10 +849,18 @@ function CustomizeModal({ sections, onSave, onClose }) {
 
 // ─── Market Rankings ───
 function MarketRankings() {
-  const [subs] = useState(() => {
+  const [subs, setSubs] = useState(() => {
     try { return JSON.parse(localStorage.getItem("jetson_submissions") || "[]"); } catch(e) { return []; }
   });
   const [activeMarket, setActiveMarket] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const handleDelete = (id) => {
+    const remaining = subs.filter(s => s.id !== id);
+    setSubs(remaining);
+    try { localStorage.setItem("jetson_submissions", JSON.stringify(remaining)); } catch(e) {}
+    setConfirmDelete(null);
+  };
 
   if (subs.length === 0) return null;
 
@@ -900,6 +908,16 @@ function MarketRankings() {
                 <div className="meta">{s.address}{s.evaluator ? ` · ${s.evaluator}` : ""}{s.gutScore > 0 ? ` · Gut: ${GUT_LABELS[s.gutScore]}` : ""}</div>
               </div>
               <div className={`rank-score ${scoreClr(s.overallScore)}`}>{s.overallScore}</div>
+              {confirmDelete === s.id ? (
+                <div style={{display:"flex",gap:4,marginLeft:8}}>
+                  <button className="btn-delete-draft" onClick={() => handleDelete(s.id)}>Confirm</button>
+                  <button style={{padding:"8px 12px",borderRadius:8,fontSize:12,fontWeight:600,border:"1px solid #d1d5db",background:"#fff",color:"#374151"}} onClick={() => setConfirmDelete(null)}>Cancel</button>
+                </div>
+              ) : (
+                <button className="btn-delete-draft" style={{marginLeft:8}} onClick={() => setConfirmDelete(s.id)} title="Remove from rankings">
+                  <Icon name="trash" size={14} color="#dc2626"/>
+                </button>
+              )}
             </div>
           ))}
         </div>
