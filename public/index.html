@@ -556,7 +556,55 @@ const DEFAULT_SECTIONS = [
     photos:[] },
 ];
 
+// ─── Rocket (Flex Warehouse) Sections ───
+// Used for "Rocket" site type. Smaller flex/multi-tenant industrial spaces have
+// a different evaluation profile than full Gravity warehouses.
+const ROCKET_SECTIONS = [
+  { id:"loading", name:"Loading & Access", icon:"truck",
+    criteria:[
+      {id:"dock_proximity",label:"Proximity to Dock Doors",score:0,notes:""},
+      {id:"door_type",label:"Door Type — Ramp vs Grade-Level",score:0,notes:""},
+      {id:"ramp_access",label:"Ramp Loading Access (if ramp)",score:0,notes:""},
+      {id:"hallway",label:"Hallway / Corridor Width",score:0,notes:""}
+    ],
+    measurements:[
+      {id:"dock_distance_ft",label:"Distance to Nearest Dock (ft)",value:""},
+      {id:"hallway_width_ft",label:"Hallway Width (ft)",value:""}
+    ],
+    photos:[] },
+  { id:"site", name:"Site & Security", icon:"shield",
+    criteria:[
+      {id:"neighborhood",label:"Neighborhood / Surrounding Area",score:0,notes:""},
+      {id:"security",label:"Building / Tenant Security",score:0,notes:""},
+      {id:"parking",label:"Parking Availability",score:0,notes:""}
+    ],
+    measurements:[{id:"parking_spaces",label:"Parking Spaces",value:""}],
+    photos:[] },
+  { id:"utilities", name:"Utilities & Charging", icon:"zap",
+    criteria:[
+      {id:"power_access",label:"Power Access in Unit",score:0,notes:""},
+      {id:"ev_proximity",label:"3rd-Party EV Charging Proximity",score:0,notes:""}
+    ],
+    measurements:[
+      {id:"amps",label:"Service (amps)",value:""},
+      {id:"voltage",label:"Voltage",value:""},
+      {id:"nearest_charger_mi",label:"Nearest Public Charger (mi)",value:""}
+    ],
+    photos:[] },
+  { id:"availability", name:"Availability", icon:"clipboard",
+    criteria:[
+      {id:"timing",label:"Move-In Availability / Timing",score:0,notes:""},
+      {id:"lease_terms",label:"Lease Flexibility / Terms",score:0,notes:""}
+    ],
+    measurements:[{id:"available_sf",label:"Available SF",value:""}],
+    photos:[] },
+];
+
+const sectionsForType = (type) =>
+  JSON.parse(JSON.stringify(type === "rocket" ? ROCKET_SECTIONS : DEFAULT_SECTIONS));
+
 const DEFAULT_SITE = {
+  siteType:"gravity",
   address:"",city:"",state:"",zip:"",propertyName:"",evaluator:"",
   date:new Date().toISOString().slice(0,10),landlord:"",broker:"",askingRate:"",availableSF:"",yearBuilt:"",zoning:""
 };
@@ -1351,7 +1399,7 @@ function App() {
   const saveTimer = useRef(null);
   const createdAt = useRef(Date.now());
 
-  const [sections, setSections] = useState(JSON.parse(JSON.stringify(DEFAULT_SECTIONS)));
+  const [sections, setSections] = useState(sectionsForType(DEFAULT_SITE.siteType));
   const [tab, setTab] = useState("info");
   const [secIdx, setSecIdx] = useState(0);
   const [sketch, setSketch] = useState(null);
@@ -1363,7 +1411,7 @@ function App() {
   const addTI = () => setTiItems(p=>[...p,{id:Date.now(),text:"",est:""}]);
   const updateTI = (id,k,v) => setTiItems(p=>p.map(i=>i.id===id?{...i,[k]:v}:i));
   const removeTI = (id) => setTiItems(p=>p.filter(i=>i.id!==id));
-  const DEFAULT_SCRIPT_URL = "https://script.google.com/a/macros/jetsonhome.com/s/AKfycbzaITlc2DcKQIPds8YoNfwBUtkPDUZr3wCvyGAD5hIN23KPHRocMjha2o1hnl7ZmqDy/exec";
+  const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxvKFkuQ5fP3vlNJJrwOA-BzpDvSubFBGLqfsT8FDdpnqYYJfB-XgztmRkjlWVQBWSF/exec";
   const [scriptUrl, setScriptUrl] = useState(() => {
     try { return window.localStorage?.getItem("jetson_script_url") || DEFAULT_SCRIPT_URL; } catch(e) { return DEFAULT_SCRIPT_URL; }
   });
@@ -1376,6 +1424,22 @@ function App() {
   const upSite = (k,v) => setSite(p=>({...p,[k]:v}));
   const upCrit = (si,ci,k,v) => setSections(p=>{const n=[...p];n[si]={...n[si],criteria:[...n[si].criteria]};n[si].criteria[ci]={...n[si].criteria[ci],[k]:v};return n;});
   const upMeas = (si,mi,v) => setSections(p=>{const n=[...p];n[si]={...n[si],measurements:[...n[si].measurements]};n[si].measurements[mi]={...n[si].measurements[mi],value:v};return n;});
+
+  // ─── Switch between Gravity (full warehouse) and Rocket (flex) site types ───
+  // Swaps the section template. Warns if there's already entered scoring data,
+  // since the section structures don't overlap and existing scores would be lost.
+  const handleSetSiteType = (type) => {
+    if ((site.siteType || "gravity") === type) return;
+    const hasEntries = sections.some(s =>
+      s.criteria.some(c => c.score > 0 || (c.notes && c.notes.trim())) ||
+      s.measurements.some(m => m.value && String(m.value).trim() && m.value !== "no") ||
+      s.photos.length > 0
+    );
+    if (hasEntries && !window.confirm("Switching site type will clear all evaluation scores, notes, and photos already entered. Continue?")) return;
+    upSite("siteType", type);
+    setSections(sectionsForType(type));
+    setSecIdx(0);
+  };
 
   // ─── Photo add/remove with immediate blob persistence ───
   const addPhoto = useCallback((si, ph) => {
@@ -1518,7 +1582,7 @@ function App() {
   const handleNewDraft = () => {
     const newId = "draft_" + Date.now();
     setSite({...DEFAULT_SITE});
-    setSections(JSON.parse(JSON.stringify(DEFAULT_SECTIONS)));
+    setSections(sectionsForType(DEFAULT_SITE.siteType));
     setGutScore(0);
     setGutNotes("");
     setTiItems([]);
@@ -1610,7 +1674,7 @@ function App() {
           <button className="btn" style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",marginBottom:16}} onClick={()=>{
             if (window.confirm("Reset this evaluation? All scores, notes, photos, and site info will be cleared.")) {
               setSite({...DEFAULT_SITE});
-              setSections(JSON.parse(JSON.stringify(DEFAULT_SECTIONS)));
+              setSections(sectionsForType(DEFAULT_SITE.siteType));
               setSketch(null);
               setGutScore(0);
               setGutNotes("");
@@ -1646,6 +1710,38 @@ function App() {
               return n;
             });
           }} />
+          <div className="card">
+            <h2>Site Type</h2>
+            <div style={{display:"flex",gap:8}}>
+              <button
+                className="btn"
+                onClick={()=>handleSetSiteType("gravity")}
+                style={{
+                  flex:1,
+                  background: (site.siteType || "gravity") === "gravity" ? "#2563eb" : "#f3f4f6",
+                  color: (site.siteType || "gravity") === "gravity" ? "#fff" : "#374151",
+                  fontWeight:600
+                }}>
+                Gravity
+              </button>
+              <button
+                className="btn"
+                onClick={()=>handleSetSiteType("rocket")}
+                style={{
+                  flex:1,
+                  background: site.siteType === "rocket" ? "#2563eb" : "#f3f4f6",
+                  color: site.siteType === "rocket" ? "#fff" : "#374151",
+                  fontWeight:600
+                }}>
+                Rocket (Flex)
+              </button>
+            </div>
+            <p style={{fontSize:12,color:"#6b7280",marginTop:8,marginBottom:0}}>
+              {site.siteType === "rocket"
+                ? "Flex warehouse evaluation — loading access, hallway width, parking, power, EV charging proximity."
+                : "Full warehouse evaluation — exterior, dock, interior, electrical, office, safety, location."}
+            </p>
+          </div>
           <div className="card">
             <h2>Property</h2>
             <input placeholder="Property Name" value={site.propertyName} onChange={e=>upSite("propertyName",e.target.value)} style={{marginBottom:8}} />

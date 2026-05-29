@@ -14,8 +14,52 @@
 // ══════════════════════════════════════════════════════════════════════
 
 var ROOT_FOLDER_ID = "1bZZDFj0HycamRivMl1g-1l8f5UcGvPV-";  // <-- Your Drive folder ID
-var SHEET_ID = "YOUR_SHEET_ID_HERE";                          // <-- Create a Google Sheet and paste its ID here
+var SHEET_ID = "1jct-23qecfnKeUbFdwfYqO3s5WSUzph-2vnlfABGP3E";  // Jetson Site Evaluations sheet
 var SHEET_TAB = "Evaluations";                                // <-- Tab name in the sheet
+
+// ─── State abbreviation → full name (for state subfolders) ───
+var STATE_NAMES = {
+  AL:"Alabama", AK:"Alaska", AZ:"Arizona", AR:"Arkansas", CA:"California",
+  CO:"Colorado", CT:"Connecticut", DE:"Delaware", DC:"District of Columbia",
+  FL:"Florida", GA:"Georgia", HI:"Hawaii", ID:"Idaho", IL:"Illinois",
+  IN:"Indiana", IA:"Iowa", KS:"Kansas", KY:"Kentucky", LA:"Louisiana",
+  ME:"Maine", MD:"Maryland", MA:"Massachusetts", MI:"Michigan", MN:"Minnesota",
+  MS:"Mississippi", MO:"Missouri", MT:"Montana", NE:"Nebraska", NV:"Nevada",
+  NH:"New Hampshire", NJ:"New Jersey", NM:"New Mexico", NY:"New York",
+  NC:"North Carolina", ND:"North Dakota", OH:"Ohio", OK:"Oklahoma", OR:"Oregon",
+  PA:"Pennsylvania", RI:"Rhode Island", SC:"South Carolina", SD:"South Dakota",
+  TN:"Tennessee", TX:"Texas", UT:"Utah", VT:"Vermont", VA:"Virginia",
+  WA:"Washington", WV:"West Virginia", WI:"Wisconsin", WY:"Wyoming"
+};
+
+function stateFolderName_(stateRaw) {
+  if (!stateRaw) return "";
+  var s = String(stateRaw).trim();
+  if (!s) return "";
+  var upper = s.toUpperCase();
+  return STATE_NAMES[upper] || s;
+}
+
+function getOrCreateChildFolder_(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+function siteFolderName_(siteInfo) {
+  var name = (siteInfo.propertyName || siteInfo.address || "Untitled")
+    + " - " + (siteInfo.address || "")
+    + " (" + (siteInfo.date || new Date().toISOString().slice(0, 10)) + ")";
+  return name.replace(/[\/\\:*?"<>|]/g, "");
+}
+
+// Returns the canonical site folder (creating state subfolder + site folder as needed).
+// Used by BOTH submit_evaluation and upload_photo so they always land in the SAME folder.
+function resolveSiteFolder_(siteInfo) {
+  var root = DriveApp.getFolderById(ROOT_FOLDER_ID);
+  var stateName = stateFolderName_(siteInfo.state);
+  var parent = stateName ? getOrCreateChildFolder_(root, stateName) : root;
+  return getOrCreateChildFolder_(parent, siteFolderName_(siteInfo));
+}
 
 // ─── GET: Return all evaluation data as JSON ───
 function doGet(e) {
@@ -57,19 +101,11 @@ function doGet(e) {
 function doPost(e) {
   try {
     var data = JSON.parse(e.parameter.payload);
-    var root = DriveApp.getFolderById(ROOT_FOLDER_ID);
 
     // ═══ SUBMIT EVALUATION ═══
     if (data.action === "submit_evaluation") {
-      // Create subfolder: "PropertyName - Address (Date)"
-      var folderName = (data.siteInfo.propertyName || data.siteInfo.address || "Untitled")
-        + " - " + (data.siteInfo.address || "")
-        + " (" + (data.siteInfo.date || new Date().toISOString().slice(0, 10)) + ")";
-      folderName = folderName.replace(/[\/\\:*?"<>|]/g, "");
-
-      // Check if folder already exists (resume case)
-      var existing = root.getFoldersByName(folderName);
-      var folder = existing.hasNext() ? existing.next() : root.createFolder(folderName);
+      var folder = resolveSiteFolder_(data.siteInfo);
+      var folderName = folder.getName();
 
       // Save PDF report
       if (data.pdfData) {
@@ -98,7 +134,7 @@ function doPost(e) {
       // ─── Log to Google Sheet for Portfolio integration ───
       logEvaluationToSheet(data);
 
-      // Save folder ID for photo uploads
+      // Cache folder ID for photo uploads (fast path)
       PropertiesService.getScriptProperties().setProperty(
         "lastFolder_" + data.siteInfo.date + "_" + (data.siteInfo.propertyName || ""),
         folder.getId()
@@ -115,11 +151,13 @@ function doPost(e) {
       var folder;
 
       if (folderId) {
+        // Fast path: we just created/used this folder in submit_evaluation
         folder = DriveApp.getFolderById(folderId);
       } else {
-        var searchName = (data.siteKey.propertyName || data.siteKey.address || "Untitled");
-        var folders = root.getFoldersByName(searchName);
-        folder = folders.hasNext() ? folders.next() : root.createFolder(searchName);
+        // Fallback: resolve the SAME folder we would have built in submit_evaluation
+        // (this is what fixes duplicate-folder bug — previously this branch fell
+        // through to root.createFolder(propertyName) and made a second folder)
+        folder = resolveSiteFolder_(data.siteKey);
       }
 
       var base64 = data.photoData.replace(/^data:image\/\w+;base64,/, "");
@@ -177,6 +215,7 @@ function logEvaluationToSheet(data) {
 
     var evalRecord = {
       id: "eval_" + Date.now(),
+      siteType: si.siteType || "gravity",
       propertyName: si.propertyName || si.address || "Untitled",
       address: si.address || "",
       city: si.city || "",
