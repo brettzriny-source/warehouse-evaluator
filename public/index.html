@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Site Eval">
-<meta name="theme-color" content="#1e40af">
+<meta name="theme-color" content="#113823">
 <title>Warehouse Site Evaluator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -14,24 +14,25 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
+@font-face{font-family:'MNKY Jane';src:url('mnkyjane-variable.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:swap}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;color:#111827;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
+body{font-family:'MNKY Jane',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#FBFAF1;color:#0F1F0D;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
 input,textarea,select,button{font-family:inherit;font-size:14px}
 input:not([type="checkbox"]),textarea,select{-webkit-appearance:none;border-radius:8px;border:1px solid #d1d5db;padding:10px 12px;width:100%;background:#fff}
-input:focus,textarea:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.15)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#3CD567;box-shadow:0 0 0 3px rgba(60,213,103,0.30)}
 button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .container{max-width:500px;margin:0 auto;padding:0 16px}
-.header{background:#fff;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:40;padding-top:env(safe-area-inset-top)}
+.header{background:#fff;border-bottom:1px solid #e5e7eb;border-top:3px solid #3CD567;position:sticky;top:0;z-index:40;padding-top:env(safe-area-inset-top)}
 .header-inner{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;max-width:500px;margin:0 auto}
 .header h1{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px}
-.title-input{font-size:18px;font-weight:700;border:1px solid #3b82f6;border-radius:8px;padding:4px 8px;max-width:240px}
+.title-input{font-size:18px;font-weight:700;border:1px solid #3CD567;border-radius:8px;padding:4px 8px;max-width:240px}
 .title-pencil{flex-shrink:0;opacity:0.6}
-.badge{font-size:11px;background:#dbeafe;color:#1d4ed8;padding:3px 8px;border-radius:999px;font-weight:600}
+.badge{font-size:11px;background:#CBFF8A;color:#0F1F0D;padding:3px 8px;border-radius:999px;font-weight:600}
 .settings-btn{padding:8px;border-radius:8px;background:none;border:none}
 .settings-btn:active{background:#f3f4f6}
 .tabs{display:flex;max-width:500px;margin:0 auto;padding:0 8px}
 .tab{flex:1;padding:10px 0;text-align:center;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:#6b7280;transition:all 0.2s}
-.tab.active{border-bottom-color:#2563eb;color:#2563eb}
+.tab.active{border-bottom-color:#3CD567;color:#113823}
 .card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px}
 .card h2{font-size:15px;font-weight:700;color:#1f2937;margin-bottom:12px}
 .card h3{font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;display:flex;align-items:center;gap:6px}
@@ -48,16 +49,16 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .section-pills{display:flex;gap:6px;overflow-x:auto;padding:0 0 8px;-webkit-overflow-scrolling:touch}
 .section-pills::-webkit-scrollbar{display:none}
 .pill{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 10px;border-radius:12px;font-size:10px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#4b5563;white-space:nowrap}
-.pill.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.pill.active{background:#113823;color:#fff;border-color:#113823}
 .pill.done{background:#f0fdf4;color:#15803d;border-color:#bbf7d0}
 .pill svg{width:16px;height:16px}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;font-size:14px;font-weight:600;border:none;width:100%}
-.btn-primary{background:#2563eb;color:#fff}
-.btn-primary:active{background:#1d4ed8}
-.btn-secondary{background:#fff;color:#2563eb;border:2px solid #2563eb}
-.btn-secondary:active{background:#eff6ff}
-.btn-photo{background:#2563eb;color:#fff;padding:10px 16px;border-radius:8px;width:auto;font-size:13px;display:flex;align-items:center;gap:6px}
-.btn-photo:active{background:#1d4ed8}
+.btn-primary{background:#113823;color:#fff}
+.btn-primary:active{background:#0F1F0D}
+.btn-secondary{background:#fff;color:#113823;border:2px solid #113823}
+.btn-secondary:active{background:#ecfbf0}
+.btn-photo{background:#113823;color:#fff;padding:10px 16px;border-radius:8px;width:auto;font-size:13px;display:flex;align-items:center;gap:6px}
+.btn-photo:active{background:#0F1F0D}
 .btn-nav{flex:1}
 .nav-row{display:flex;gap:12px;margin-top:16px}
 .photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -67,11 +68,11 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .photo-remove{position:absolute;top:4px;right:4px;background:#ef4444;color:#fff;border:none;border-radius:999px;width:22px;height:22px;font-size:14px;line-height:22px;text-align:center;padding:0}
 .canvas-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .tool-btn{padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;border:none;background:#f3f4f6;color:#374151}
-.tool-btn.active{background:#2563eb;color:#fff}
+.tool-btn.active{background:#113823;color:#fff}
 .tool-btn.danger{background:#fef2f2;color:#dc2626}
 .canvas-wrap{border:2px solid #e5e7eb;border-radius:12px;overflow:hidden;touch-action:none}
 .canvas-wrap canvas{width:100%;display:block}
-.score-hero{background:linear-gradient(135deg,#2563eb,#1e3a8a);border-radius:16px;padding:24px;color:#fff;text-align:center;margin-bottom:12px}
+.score-hero{background:linear-gradient(135deg,#113823,#0F1F0D);border-radius:16px;padding:24px;color:#fff;text-align:center;margin-bottom:12px}
 .score-hero .label{font-size:12px;text-transform:uppercase;letter-spacing:1px;opacity:0.8}
 .score-hero .big{font-size:48px;font-weight:800;margin:4px 0}
 .score-hero .sub{font-size:12px;opacity:0.8}
@@ -80,7 +81,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .score-row .detail{font-size:11px;color:#6b7280}
 .score-bar-wrap{display:flex;align-items:center;gap:8px}
 .score-bar{width:80px;height:6px;background:#f3f4f6;border-radius:999px;overflow:hidden}
-.score-bar-fill{height:100%;background:#3b82f6;border-radius:999px}
+.score-bar-fill{height:100%;background:#3CD567;border-radius:999px}
 .score-num{font-size:18px;font-weight:700;min-width:28px;text-align:right}
 .score-green{color:#16a34a}.score-yellow{color:#ca8a04}.score-red{color:#dc2626}.score-gray{color:#9ca3af}
 .flags{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin-bottom:12px}
@@ -98,25 +99,25 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .modal-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .modal-row input{flex:1}
 .modal-remove{padding:6px;background:none;border:none;color:#ef4444}
-.modal-add{background:none;border:none;color:#2563eb;font-size:13px;font-weight:600;padding:4px 0;display:flex;align-items:center;gap:4px}
+.modal-add{background:none;border:none;color:#113823;font-size:13px;font-weight:600;padding:4px 0;display:flex;align-items:center;gap:4px}
 .modal-actions{display:flex;gap:12px;margin-top:16px}
 .modal-actions button{flex:1;padding:12px;border-radius:8px;font-size:14px;font-weight:600}
 .modal-cancel{background:#fff;border:1px solid #d1d5db;color:#374151}
-.modal-save{background:#2563eb;border:none;color:#fff}
+.modal-save{background:#113823;border:none;color:#fff}
 .measure-label{font-size:11px;color:#6b7280;margin-bottom:2px}
 .text-xs{font-size:12px;color:#6b7280;text-align:center;margin-top:8px}
 .hidden{display:none}
 .flex-center{display:flex;align-items:center;gap:6px}
 .submit-progress{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px}
 .submit-progress .prog-bar{width:100%;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:8px 0}
-.submit-progress .prog-fill{height:100%;background:#2563eb;border-radius:999px;transition:width 0.3s}
+.submit-progress .prog-fill{height:100%;background:#113823;border-radius:999px;transition:width 0.3s}
 .submit-progress .prog-text{font-size:13px;color:#4b5563}
 .submit-progress .prog-status{font-size:12px;color:#6b7280;margin-top:4px}
 .btn-submit{background:#16a34a;color:#fff}
 .btn-submit:active{background:#15803d}
 .btn-submit:disabled{background:#9ca3af;cursor:not-allowed}
 .success-banner{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:12px;text-align:center}
-.success-banner a{color:#2563eb;font-weight:600;text-decoration:underline}
+.success-banner a{color:#113823;font-weight:600;text-decoration:underline}
 .config-card{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px;margin-bottom:12px}
 .config-card h3{font-size:14px;font-weight:600;color:#92400e;margin-bottom:8px}
 .config-card p{font-size:13px;color:#78350f;margin-bottom:8px}
@@ -132,7 +133,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .save-dot.pulse{animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:12px;color:#6b7280}
-.loading-spinner{width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 0.8s linear infinite}
+.loading-spinner{width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#113823;border-radius:50%;animation:spin 0.8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .draft-list{padding:0;list-style:none}
 .draft-item{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -141,30 +142,30 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .draft-item-meta{font-size:11px;color:#6b7280;margin-top:2px}
 .draft-item-actions{display:flex;gap:6px;flex-shrink:0}
 .draft-item-actions button{padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;border:none}
-.btn-resume{background:#2563eb;color:#fff}
-.btn-resume:active{background:#1d4ed8}
+.btn-resume{background:#113823;color:#fff}
+.btn-resume:active{background:#0F1F0D}
 .btn-delete-draft{background:#fef2f2;color:#dc2626}
 .btn-delete-draft:active{background:#fee2e2}
 .compress-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6b7280;margin-left:8px}
 .storage-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:8px}
-.scan-card{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:12px}
-.scan-card h3{font-size:14px;font-weight:600;color:#1e40af;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.scan-card{background:#ecfbf0;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:12px}
+.scan-card h3{font-size:14px;font-weight:600;color:#113823;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .scan-result{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-top:12px}
 .scan-result-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;border-bottom:1px solid #f3f4f6}
 .scan-result-row:last-child{border:none}
 .scan-result-row .label{color:#6b7280;font-weight:500}
 .scan-result-row .value{color:#1f2937;font-weight:600}
-.btn-scan{background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;width:auto;font-size:13px;display:flex;align-items:center;gap:6px;border:none}
-.btn-scan:active{background:#1e3a8a}
+.btn-scan{background:#113823;color:#fff;padding:10px 16px;border-radius:8px;width:auto;font-size:13px;display:flex;align-items:center;gap:6px;border:none}
+.btn-scan:active{background:#0F1F0D}
 .btn-scan:disabled{background:#9ca3af}
 .checkbox-row{display:flex;align-items:center;gap:10px;padding:8px 0}
-.checkbox-row input[type="checkbox"]{width:20px;height:20px;border-radius:4px;accent-color:#2563eb;flex-shrink:0}
+.checkbox-row input[type="checkbox"]{width:20px;height:20px;border-radius:4px;accent-color:#113823;flex-shrink:0}
 .checkbox-row label{font-size:14px;font-weight:500;color:#1f2937}
 .crime-card{background:#fefce8;border:1px solid #fde68a;border-radius:12px;padding:16px;margin-bottom:12px}
 .crime-card h3{font-size:14px;font-weight:600;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .crime-links{display:flex;flex-direction:column;gap:6px;margin-top:8px}
-.crime-links a{font-size:13px;color:#2563eb;text-decoration:none;display:flex;align-items:center;gap:4px}
-.crime-links a:active{color:#1d4ed8}
+.crime-links a{font-size:13px;color:#113823;text-decoration:none;display:flex;align-items:center;gap:4px}
+.crime-links a:active{color:#0F1F0D}
 .rank-section{margin-bottom:20px}
 .rank-header{font-size:14px;font-weight:600;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .rank-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:12px}
@@ -175,7 +176,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rank-score{font-size:18px;font-weight:700;min-width:32px;text-align:right}
 .rank-tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px}
 .rank-tab{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#4b5563;white-space:nowrap;flex-shrink:0}
-.rank-tab.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.rank-tab.active{background:#113823;color:#fff;border-color:#113823}
 @media print{.sticky,button,input[type="file"],.header,.section-pills,.nav-row{display:none!important}body{font-size:12px}}
 </style>
 </head>
@@ -668,8 +669,8 @@ function PhotoCapture({ photos, onAdd, onRemove, sectionName, storageQuota }) {
         <button className="btn-photo" onClick={() => fileRef.current?.click()} disabled={compressing}>
           <Icon name="camera" size={16} color="#fff" /> {compressing ? "Working..." : "Take Photo"}
         </button>
-        <button className="btn-photo" style={{background:"#fff",color:"#2563eb",border:"2px solid #2563eb"}} onClick={() => uploadRef.current?.click()} disabled={compressing}>
-          <Icon name="upload" size={16} color="#2563eb" /> Upload
+        <button className="btn-photo" style={{background:"#fff",color:"#113823",border:"2px solid #113823"}} onClick={() => uploadRef.current?.click()} disabled={compressing}>
+          <Icon name="upload" size={16} color="#113823" /> Upload
         </button>
         {compressing && <span className="compress-badge"><span className="save-dot orange pulse"/>Optimizing...</span>}
       </div>
@@ -738,7 +739,7 @@ function TourBookScanner({ onFieldsExtracted }) {
 
   return (
     <div className="scan-card">
-      <h3><Icon name="camera" size={16} color="#1e40af"/> Scan Tour Book</h3>
+      <h3><Icon name="camera" size={16} color="#113823"/> Scan Tour Book</h3>
       <p style={{fontSize:12,color:"#4b5563",marginBottom:12}}>Take a photo of the property spec sheet to auto-fill fields.</p>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleScan} className="hidden" />
       <button className="btn-scan" onClick={() => fileRef.current?.click()} disabled={scanning}>
@@ -774,7 +775,7 @@ function SketchCanvas({ sketchData, onSave }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState("pen");
-  const [color, setColor] = useState("#1e40af");
+  const [color, setColor] = useState("#113823");
   const [lineWidth, setLineWidth] = useState(3);
   const lastPos = useRef(null);
 
@@ -855,7 +856,7 @@ function CustomizeModal({ sections, onSave, onClose }) {
                 <button className="modal-remove" onClick={()=>rmC(si,ci)}><Icon name="trash" size={16} color="#ef4444"/></button>
               </div>
             ))}
-            <button className="modal-add" onClick={()=>addC(si)}><Icon name="plus" size={14} color="#2563eb"/> Add</button>
+            <button className="modal-add" onClick={()=>addC(si)}><Icon name="plus" size={14} color="#113823"/> Add</button>
           </div>
         ))}
         <div className="modal-actions">
@@ -918,7 +919,7 @@ function MarketRankings() {
         .map(([date, sites]) => (
         <div key={date} className="rank-section">
           <div className="rank-header">
-            <Icon name="compass" size={16} color="#2563eb"/> Tour: {date}
+            <Icon name="compass" size={16} color="#113823"/> Tour: {date}
           </div>
           {sites.map((s, idx) => (
             <div key={s.id} className="rank-item">
@@ -960,8 +961,8 @@ function DraftPicker({ onResume, onNew, onDelete }) {
   return (
     <div className="container" style={{paddingTop:24,paddingBottom:40}}>
       <div style={{textAlign:"center",marginBottom:24}}>
-        <Icon name="building" size={40} color="#2563eb"/>
-        <h2 style={{fontSize:20,fontWeight:700,marginTop:8}}>Site Evaluator</h2>
+        <img src="jetson-logo.png" alt="Jetson" style={{height:40,width:"auto",margin:"0 auto",display:"block"}}/>
+        <h2 style={{fontSize:20,fontWeight:700,marginTop:12}}>Site Evaluator</h2>
         <p style={{fontSize:13,color:"#6b7280",marginTop:4}}>Your evaluations are saved locally on this device.</p>
       </div>
 
@@ -1022,7 +1023,7 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
   const checkPage = (needed) => { if (y + needed > 740) { doc.addPage(); y = margin; } };
 
   // ─ Header ─
-  doc.setFillColor(37, 99, 235);
+  doc.setFillColor(17, 56, 35);
   doc.rect(0, 0, W, 80, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
@@ -1037,7 +1038,7 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
   y = 100;
 
   // ─ Site Info ─
-  doc.setTextColor(30, 64, 175);
+  doc.setTextColor(17, 56, 35);
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
   doc.text("Site Information", margin, y);
@@ -1067,7 +1068,7 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
     // Section header
     doc.setFillColor(243, 244, 246);
     doc.rect(margin, y - 12, contentW, 18, "F");
-    doc.setTextColor(30, 64, 175);
+    doc.setTextColor(17, 56, 35);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(sec.name, margin + 6, y);
@@ -1127,7 +1128,7 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
   // ─ Gut Feel ─
   if (gutScore > 0) {
     checkPage(50);
-    doc.setTextColor(30, 64, 175);
+    doc.setTextColor(17, 56, 35);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("Gut Feel", margin, y);
@@ -1151,7 +1152,7 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
   const tiFiltered = (tiItems || []).filter(i => i.text);
   if (tiFiltered.length > 0) {
     checkPage(40);
-    doc.setTextColor(30, 64, 175);
+    doc.setTextColor(17, 56, 35);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("TI Requests", margin, y);
@@ -1172,7 +1173,7 @@ function generateEvalPDF(siteInfo, sections, gutScore, gutNotes, overallScore, t
   // ─ Misc Notes ─
   if (miscNotes) {
     checkPage(40);
-    doc.setTextColor(30, 64, 175);
+    doc.setTextColor(17, 56, 35);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("Additional Notes", margin, y);
@@ -1370,7 +1371,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
       {tiItems && tiItems.length > 0 && (
         <div className="card" style={{marginBottom:12}}>
           <h3 style={{fontSize:14,fontWeight:600,color:"#374151",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
-            <Icon name="wrench" size={16} color="#2563eb"/> TI Requests ({tiItems.length})
+            <Icon name="wrench" size={16} color="#113823"/> TI Requests ({tiItems.length})
           </h3>
           {tiItems.map((item,idx) => (
             <div key={item.id} style={{fontSize:13,padding:"6px 0",borderBottom:"1px solid #f3f4f6",display:"flex",gap:6}}>
@@ -1421,7 +1422,7 @@ function SummaryView({ siteInfo, sections, sketchData, gutScore, gutNotes, tiIte
         <Icon name="file" size={18} color="#fff"/> Print / Save as PDF
       </button>
       <button className="btn btn-secondary" style={{marginBottom:12}} onClick={exportPDF}>
-        <Icon name="download" size={18} color="#2563eb"/> Export PDF Report
+        <Icon name="download" size={18} color="#113823"/> Export PDF Report
       </button>
     </div>
   );
@@ -1445,7 +1446,7 @@ function EditableTitle({ value, onChange }) {
   }
   return (
     <h1 onClick={()=>{setDraft(value||"");setEditing(true);}} style={{cursor:"pointer",minWidth:0}} title="Tap to rename">
-      <Icon name="building" size={22} color="#2563eb"/>
+      <Icon name="building" size={22} color="#113823"/>
       <span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{value || "Untitled Evaluation"}</span>
       <Icon name="pencil" size={14} color="#9ca3af"/>
     </h1>
@@ -1781,7 +1782,7 @@ function App() {
                 onClick={()=>handleSetSiteType("gravity")}
                 style={{
                   flex:1,
-                  background: (site.siteType || "gravity") === "gravity" ? "#2563eb" : "#f3f4f6",
+                  background: (site.siteType || "gravity") === "gravity" ? "#113823" : "#f3f4f6",
                   color: (site.siteType || "gravity") === "gravity" ? "#fff" : "#374151",
                   fontWeight:600
                 }}>
@@ -1792,7 +1793,7 @@ function App() {
                 onClick={()=>handleSetSiteType("rocket")}
                 style={{
                   flex:1,
-                  background: site.siteType === "rocket" ? "#2563eb" : "#f3f4f6",
+                  background: site.siteType === "rocket" ? "#113823" : "#f3f4f6",
                   color: site.siteType === "rocket" ? "#fff" : "#374151",
                   fontWeight:600
                 }}>
@@ -1868,7 +1869,7 @@ function App() {
             const s = sections[secIdx];
             return <>
               <h2 style={{fontSize:16,fontWeight:700,margin:"12px 0",display:"flex",alignItems:"center",gap:8}}>
-                <Icon name={s.icon} size={20} color="#2563eb"/>{s.name}
+                <Icon name={s.icon} size={20} color="#113823"/>{s.name}
               </h2>
               <div className="card" style={{padding:0}}>
                 {s.criteria.map((c,ci)=>(
@@ -1906,7 +1907,7 @@ function App() {
                   <div className="crime-links">
                     {getCrimeLinks(site.city, site.state, site.zip).map((link, i) => (
                       <a key={i} href={link.url} target="_blank" rel="noopener">
-                        <Icon name="chevRight" size={14} color="#2563eb"/> {link.label}
+                        <Icon name="chevRight" size={14} color="#113823"/> {link.label}
                       </a>
                     ))}
                   </div>
@@ -1917,7 +1918,7 @@ function App() {
                 <PhotoCapture photos={s.photos} sectionName={s.name} onAdd={ph=>addPhoto(secIdx,ph)} onRemove={id=>rmPhoto(secIdx,id)} storageQuota={storageQuota}/>
               </div>
               <div className="nav-row">
-                {secIdx>0 && <button className="btn btn-secondary btn-nav" onClick={()=>setSecIdx(i=>i-1)}><Icon name="chevLeft" size={16} color="#2563eb"/> Prev</button>}
+                {secIdx>0 && <button className="btn btn-secondary btn-nav" onClick={()=>setSecIdx(i=>i-1)}><Icon name="chevLeft" size={16} color="#113823"/> Prev</button>}
                 {secIdx<sections.length-1
                   ? <button className="btn btn-primary btn-nav" onClick={()=>setSecIdx(i=>i+1)}>Next <Icon name="chevRight" size={16} color="#fff"/></button>
                   : <button className="btn btn-primary btn-nav" onClick={()=>setTab("sketch")}>Sketch <Icon name="chevRight" size={16} color="#fff"/></button>}
@@ -1931,7 +1932,7 @@ function App() {
       {tab==="sketch" && (
         <div className="container" style={{paddingTop:20,paddingBottom:40}}>
           <h2 style={{fontSize:16,fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-            <Icon name="pencil" size={20} color="#2563eb"/> Floor Plan Sketch
+            <Icon name="pencil" size={20} color="#113823"/> Floor Plan Sketch
           </h2>
           <SketchCanvas sketchData={sketch} onSave={handleSketchSave}/>
           <div style={{marginTop:16}}>
@@ -1945,7 +1946,7 @@ function App() {
         <div className="container" style={{paddingTop:20,paddingBottom:40}}>
           <div className="card">
             <div className="gut-feel-area">
-              <Icon name="heart" size={32} color="#2563eb"/>
+              <Icon name="heart" size={32} color="#113823"/>
               <h2 style={{fontSize:18,fontWeight:700,marginTop:8,marginBottom:4}}>Overall Gut Feel</h2>
               <p style={{fontSize:13,color:"#6b7280",marginBottom:12}}>Forget the numbers — how does this site feel?</p>
               <StarRating score={gutScore} onChange={setGutScore} large={true} />
@@ -1961,7 +1962,7 @@ function App() {
       {tab==="ti" && (
         <div className="container" style={{paddingTop:20,paddingBottom:40}}>
           <h2 style={{fontSize:16,fontWeight:700,marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
-            <Icon name="wrench" size={20} color="#2563eb"/> Tenant Improvement Requests
+            <Icon name="wrench" size={20} color="#113823"/> Tenant Improvement Requests
           </h2>
           <p style={{fontSize:13,color:"#6b7280",marginBottom:16}}>What would you need the landlord to do before move-in?</p>
 
@@ -1988,7 +1989,7 @@ function App() {
           ))}
 
           <button onClick={addTI} className="btn btn-secondary" style={{marginTop:8,marginBottom:16}}>
-            <Icon name="plus" size={16} color="#2563eb"/> Add Item
+            <Icon name="plus" size={16} color="#113823"/> Add Item
           </button>
 
           <button className="btn btn-primary" onClick={()=>setTab("summary")}>View Summary <Icon name="chevRight" size={18} color="#fff"/></button>
